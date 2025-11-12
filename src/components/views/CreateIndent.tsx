@@ -75,55 +75,37 @@ export default () => {
         name: 'products',
     });
 
-    async function onSubmit(data: z.infer<typeof schema>) {
+    async function onSubmit(data) {
         try {
-            const rows: Partial<IndentSheet>[] = [];
             for (const product of data.products) {
-                const row: Partial<IndentSheet> = {
+                const row = {
                     timestamp: new Date().toISOString(),
-                    indentNumber: `SI-${String(indentSheet.length).padStart(4, '0')}`,
                     indenterName: data.indenterName,
                     department: product.department,
-                    itemCode: product.itemCode,
                     groupHead: product.groupHead,
+                    itemCode: product.itemCode,
                     productName: product.productName,
                     quantity: product.quantity,
                     uom: product.uom,
                     specifications: product.specifications || '',
                     indentApprovedBy: data.indentApproveBy,
                     indentType: data.indentType,
+                    attachment: product.attachment ? product.attachment.name : null,
                 };
 
-                if (product.attachment !== undefined) {
-                    row.attachment = await uploadFile(
-                        product.attachment,
-                        import.meta.env.VITE_IDENT_ATTACHMENT_FOLDER
-                    );
-                }
+                const res = await fetch('http://localhost:3002/store-indent', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(row),
+                });
 
-                rows.push(row);
+                if (!res.ok) throw new Error('Failed to save indent');
             }
-            setTimeout(() => updateIndentSheet(), 1000);
-            await postToSheet(rows);
-            toast.success('Indent created successufully');
-            form.reset({
-                indenterName: '',
-                indentApproveBy: '',
-                indentType: undefined,
-                products: [
-                    {
-                        attachment: undefined,
-                        uom: '',
-                        productName: '',
-                        specifications: '',
-                        quantity: 1,
-                        itemCode: '',
-                        groupHead: '',
-                        department: '',
-                    },
-                ],
-            });
-        } catch (_) {
+
+            toast.success('Indent created successfully');
+            form.reset();
+        } catch (err) {
+            console.error(err);
             toast.error('Error while creating indent! Please try again');
         }
     }
@@ -140,87 +122,10 @@ export default () => {
             </Heading>
             <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit, onError)} className="space-y-6 p-5">
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                        <FormField
-                            control={form.control}
-                            name="indenterName"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>
-                                        Indenter Name
-                                        <span className="text-destructive">*</span>
-                                    </FormLabel>
-                                    <FormControl>
-                                        <Input placeholder="Enter indenter name" {...field} />
-                                    </FormControl>
-                                </FormItem>
-                            )}
-                        />
-
-                        <FormField
-                            control={form.control}
-                            name="indentType"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>
-                                        Indent Type
-                                        <span className="text-destructive">*</span>
-                                    </FormLabel>
-                                    <Select onValueChange={field.onChange} value={field.value}>
-                                        <FormControl>
-                                            <SelectTrigger className="w-full">
-                                                <SelectValue placeholder="Select type" />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            <SelectItem value="Purchase">Purchase</SelectItem>
-                                            <SelectItem value="Store Out">Store Out</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </FormItem>
-                            )}
-                        />
-
-                        <FormField
-                            control={form.control}
-                            name="indentApproveBy"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>
-                                        Approved By
-                                        <span className="text-destructive">*</span>
-                                    </FormLabel>
-                                    <FormControl>
-                                        <Input placeholder="Enter approved by" {...field} />
-                                    </FormControl>
-                                </FormItem>
-                            )}
-                        />
-                    </div>
+                   
 
                     <div className="space-y-4">
-                        <div className="flex justify-between items-center">
-                            <h2 className="text-lg font-semibold">Products</h2>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() =>
-                                    append({
-                                        department: '',
-                                        groupHead: '',
-                                        productName: '',
-                                        quantity: 1,
-                                        uom: '',
-                                        itemCode: '',
-                                        // @ts-ignore
-                                        priority: undefined,
-                                        attachment: undefined,
-                                    })
-                                }
-                            >
-                                Add Product
-                            </Button>
-                        </div>
+                      
 
                         {fields.map((field, index) => {
                             const groupHead = products[index]?.groupHead;
@@ -245,6 +150,65 @@ export default () => {
                                         </Button>
                                     </div>
                                     <div className="grid gap-4">
+                                         <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                        <FormField
+                            control={form.control}
+                            name="indenterName"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>
+                                        Indenter Name
+                                        <span className="text-destructive">*</span>
+                                    </FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="Enter indenter name" {...field} />
+                                    </FormControl>
+                                </FormItem>
+                            )}
+                        />
+
+                        {/* <FormField
+                            control={form.control}
+                            name="indentType"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>
+                                        Indent Type
+                                        <span className="text-destructive">*</span>
+                                    </FormLabel>
+                                    <Select onValueChange={field.onChange} value={field.value}>
+                                        <FormControl>
+                                            <SelectTrigger className="w-full">
+                                                <SelectValue placeholder="Select type" />
+                                            </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                            <SelectItem value="Purchase">Purchase</SelectItem>
+                                            <SelectItem value="Store Out">Store Out</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </FormItem>
+                            )}
+                        /> */}
+
+                         <FormField
+                            control={form.control}
+                            name="indenterName"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>
+                                        Indent NO
+                                        <span className="text-destructive">*</span>
+                                    </FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="Enter Indent No" {...field} />
+                                    </FormControl>
+                                </FormItem>
+                            )}
+                        />
+
+
+                    </div>
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                             <FormField
                                                 control={form.control}
@@ -341,7 +305,7 @@ export default () => {
                                                 render={({ field }) => (
                                                     <FormItem>
                                                         <FormLabel>
-                                                            Product Name
+                                                            Item  Name
                                                             <span className="text-destructive">
                                                                 *
                                                             </span>
@@ -410,29 +374,64 @@ export default () => {
                                                 )}
                                             />
                                         </div>
-                                        <FormField
-                                            control={form.control}
-                                            name={`products.${index}.attachment`}
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Attachment</FormLabel>
-                                                    <FormControl>
-                                                        <Input
-                                                            type="file"
-                                                            onChange={(e) =>
-                                                                field.onChange(e.target.files?.[0])
-                                                            }
-                                                        />
-                                                    </FormControl>
-                                                </FormItem>
-                                            )}
-                                        />
+                                        
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+  {/* Division */}
+  <FormField
+    control={form.control}
+    name="division"
+    render={({ field }) => (
+      <FormItem>
+        <FormLabel>
+          Division <span className="text-destructive">*</span>
+        </FormLabel>
+        <FormControl>
+          <Input placeholder="Enter division" {...field} />
+        </FormControl>
+      </FormItem>
+    )}
+  />
+
+  {/* Required Date */}
+  <FormField
+    control={form.control}
+    name="requiredDate"
+    render={({ field }) => (
+      <FormItem>
+        <FormLabel>
+          Required Date <span className="text-destructive">*</span>
+        </FormLabel>
+        <FormControl>
+          <Input type="date" {...field} />
+        </FormControl>
+      </FormItem>
+    )}
+  />
+
+  {/* Indent Date */}
+  <FormField
+    control={form.control}
+    name="indentDate"
+    render={({ field }) => (
+      <FormItem>
+        <FormLabel>
+          Indent Date <span className="text-destructive">*</span>
+        </FormLabel>
+        <FormControl>
+          <Input type="date" {...field} />
+        </FormControl>
+      </FormItem>
+    )}
+  />
+</div>
+
+                           
                                         <FormField
                                             control={form.control}
                                             name={`products.${index}.specifications`}
                                             render={({ field }) => (
                                                 <FormItem className="w-full">
-                                                    <FormLabel>Specifications</FormLabel>
+                                                    <FormLabel>Item Technical Specification</FormLabel>
                                                     <FormControl>
                                                         <Textarea
                                                             placeholder="Enter specifications"
@@ -449,18 +448,45 @@ export default () => {
                         })}
                     </div>
 
-                    <div>
-                        <Button
-                            className="w-full"
-                            type="submit"
-                            disabled={form.formState.isSubmitting}
-                        >
-                            {form.formState.isSubmitting && (
-                                <Loader size={20} color="white" aria-label="Loading Spinner" />
-                            )}
-                            Create Indent
-                        </Button>
-                    </div>
+                    <div className="space-y-4">
+  {/* Top bar with buttons on both sides */}
+  <div className="flex flex-col sm:flex-row justify-between items-center gap-2">
+    <Button
+      className="w-full sm:w-auto"
+      type="submit"
+      disabled={form.formState.isSubmitting}
+    >
+      {form.formState.isSubmitting && (
+        <Loader size={20} color="white" aria-label="Loading Spinner" />
+      )}
+      Create Indent
+    </Button>
+
+    <Button
+      type="button"
+      variant="outline"
+      className="w-full sm:w-auto"
+      onClick={() =>
+        append({
+          department: '',
+          groupHead: '',
+          productName: '',
+          quantity: 1,
+          uom: '',
+          itemCode: '',
+          // @ts-ignore
+          priority: undefined,
+          attachment: undefined,
+        })
+      }
+    >
+      Add Product
+    </Button>
+  </div>
+
+
+</div>
+
                 </form>
             </Form>
         </div>

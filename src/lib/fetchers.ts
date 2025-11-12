@@ -120,9 +120,38 @@ export async function postToSheet(
     });
     if (!response.ok) {
         console.error(`Error in fetch: ${response.status} - ${response.statusText}`);
-        throw new Error(`Failed to ${action} data`)};
+        throw new Error(`Failed to ${action} data`);
+    }
     const res = await response.json();
     if (!res.success) {
         console.error(`Error in response: ${res.message}`);
-        throw new Error('Something went wrong in the API')};
+        throw new Error('Something went wrong in the API');
+    }
 }
+
+
+
+const API_BASE = "http://localhost:3004/vendor-rate-update";
+
+export async function fetchVendorRateUpdatePending() {
+  const res = await fetch(`${API_BASE}/pending`);
+  if (!res.ok) throw new Error("Failed to fetch pending vendor rates");
+  return res.json();
+}
+
+export async function fetchVendorRateUpdateHistory() {
+  const res = await fetch(`${API_BASE}/history`);
+  if (!res.ok) throw new Error("Failed to fetch vendor rate history");
+  return res.json();
+}
+
+export async function submitVendorRateUpdate(indentNumber, vendors) {
+  const res = await fetch(`${API_BASE}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ indentNumber, vendors}),
+  });
+  if (!res.ok) throw new Error("Failed to update vendor rate");
+  return res.json();
+}
+

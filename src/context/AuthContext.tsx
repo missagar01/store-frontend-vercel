@@ -1,66 +1,150 @@
-import { Toaster } from '@/components/ui/sonner';
-import { fetchSheet } from '@/lib/fetchers';
-import type { UserPermissions } from '@/types/sheets';
-import React, { createContext, useContext, useEffect, useState } from 'react';
+// src/context/AuthContext.tsx
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useRef,
+} from "react";
+import { Toaster } from "@/components/ui/sonner";
+import {
+  loginUser,
+  logoutUser as apiLogout,
+  decodeToken as decodeJwtFromApi,
+  isTokenExpired,
+  handleAuthError,
+} from "@/api";
+
+interface DecodedToken {
+  sub?: number;
+  email?: string | null;
+  username?: string;
+  employee_id?: string;   // 👈 we care about this
+  role?: string;
+  iat?: number;
+  exp?: number;
+  iss?: string;
+}
 
 interface AuthState {
-    loggedIn: boolean;
-    login: (username: string, password: string) => Promise<boolean>;
-    logout: () => void;
-    loading: boolean;
-    user: UserPermissions;
+  loggedIn: boolean;
+  login: (identifier: string, password: string) => Promise<boolean>;
+  logout: () => Promise<void> | void;
+  loading: boolean;
+  user: DecodedToken | null;
+  role: string | null;
+  employee_id: string | null;  // 👈 expose it
 }
 
 const AuthContext = createContext<AuthState | null>(null);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-    const [loggedIn, setLoggedIn] = useState(false);
-    const [userPermissions, setUserPermissions] = useState<UserPermissions | null>(null);
-    const [loading, setLoading] = useState(true);
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [user, setUser] = useState<DecodedToken | null>(null);
+  const [loading, setLoading] = useState(true);
+  const tokenCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-    useEffect(() => {
-        setLoading(true);
-        const stored = localStorage.getItem('auth');
-        if (stored) {
-            const { username } = JSON.parse(stored);
-            fetchSheet('USER').then((res) => {
-                const user = (res as UserPermissions[]).find((user) => user.username === username);
-                if (user) {
-                    setUserPermissions(user);
-                    setLoggedIn(true);
-                }
-                setLoading(false);
-            });
-        } else {
-            setLoading(false);
-        }
-    }, []);
+  const decodeJwtSafe = (token: string): DecodedToken | null => {
+    try {
+      return decodeJwtFromApi(token) as DecodedToken;
+    } catch (e) {
+      console.error("Failed to decode token", e);
+      return null;
+    }
+  };
 
-    async function login(username: string, password: string) {
-        const users = (await fetchSheet('USER')) as UserPermissions[];
-        const user = users.find((user) => user.username === username && user.password === password);
-        if (user === undefined) {
-            return false;
-        }
+  const checkTokenValidity = () => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setLoggedIn(false);
+      setUser(null);
+      return false;
+    }
 
-        localStorage.setItem('auth', JSON.stringify({ username }));
-        setUserPermissions(user);
+    if (isTokenExpired(token)) {
+      console.log("Token expired, logging out...");
+      handleAuthError();
+      setLoggedIn(false);
+      setUser(null);
+      return false;
+    }
+
+    const decoded = decodeJwtSafe(token);
+    if (!decoded) {
+      localStorage.removeItem("token");
+      setLoggedIn(false);
+      setUser(null);
+      return false;
+    }
+
+    setUser(decoded);
+    setLoggedIn(true);
+    return true;
+  };
+
+  useEffect(() => {
+    const isValid = checkTokenValidity();
+    setLoading(false);
+
+    if (isValid) {
+      tokenCheckIntervalRef.current = setInterval(() => {
+        checkTokenValidity();
+      }, 30000);
+    }
+
+    return () => {
+      if (tokenCheckIntervalRef.current) {
+        clearInterval(tokenCheckIntervalRef.current);
+      }
+    };
+  }, []);
+
+  async function login(identifier: string, password: string) {
+    try {
+      const data = await loginUser(identifier, password);
+      if (data.success && data.token) {
+        const decoded = decodeJwtSafe(data.token);
+        setUser(decoded);
         setLoggedIn(true);
         return true;
+      }
+      return false;
+    } catch (err) {
+      console.error(err);
+      return false;
     }
+  }
 
-    function logout() {
-        localStorage.removeItem('auth');
-        setLoggedIn(false);
-        setUserPermissions(null);
+  async function logout() {
+    try {
+      await apiLogout();
+    } catch (e) {
+      console.error("logout api failed", e);
     }
+    localStorage.removeItem("token");
+    setLoggedIn(false);
+    setUser(null);
+  }
 
-    return (
-        <AuthContext.Provider value={{ login, loggedIn, logout, user: userPermissions!, loading }}>
-            {children}
-            <Toaster expand richColors theme="light" closeButton />
-        </AuthContext.Provider>
-    );
+  const normalizedRole = user?.role ? user.role.toString().toLowerCase() : null;
+  const employeeId = user?.employee_id ?? null;
+
+  return (
+    <AuthContext.Provider
+      value={{
+        login,
+        loggedIn,
+        logout,
+        user,
+        loading,
+        role: normalizedRole,
+        employee_id: employeeId,   // 👈 now available
+      }}
+    >
+      {children}
+      <Toaster expand richColors theme="light" closeButton />
+    </AuthContext.Provider>
+  );
 };
 
 export const useAuth = () => useContext(AuthContext)!;

@@ -1,209 +1,183 @@
-import '@/index.css';
+// src/main.tsx
+import "@/index.css";
 
-import React, { StrictMode } from 'react';
-import { createRoot } from 'react-dom/client';
-import { AuthProvider, useAuth } from '@/context/AuthContext.tsx';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import React, { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import { AuthProvider, useAuth } from "@/context/AuthContext.tsx";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
-import Login from './components/views/Login';
-import CreateIndent from './components/views/CreateIndent';
-import Dashboard from './components/views/Dashboard';
-import App from './App';
-import ApproveIndent from '@/components/views/ApproveIndent';
-import { SheetsProvider } from './context/SheetsContext';
-import VendorUpdate from './components/views/VendorUpdate';
-import RateApproval from './components/views/RateApproval';
-import ReceiveItems from './components/views/ReceiveItems';
-import StoreOutApproval from './components/views/StoreOutApproval';
-import type { RouteAttributes } from './types';
+import Login from "./components/views/Login";
+import Dashboard from "./components/views/Dashboard";
+import App from "./App";
+import ApproveIndent from "@/components/views/ApproveIndent";
+import { SheetsProvider } from "./context/SheetsContext";
+import StoreOutApproval from "./components/views/StoreOutApproval";
+import type { RouteAttributes } from "./types";
 import {
-    LayoutDashboard,
-    ClipboardList,
-    UserCheck,
-    Users,
-    ClipboardCheck,
-    Truck,
-    PackageCheck,
-    ShieldUser,
-    FilePlus2,
-    ListTodo,
-    Package2,
-    Store,
-} from 'lucide-react';
-import type { UserPermissions } from './types/sheets';
-import Administration from './components/views/Administration';
-import Loading from './components/views/Loading';
-import CreatePO from './components/views/CreatePO';
-import PendingIndents from './components/views/PendingIndents';
-import Order from './components/views/Order';
-import Inventory from './components/views/Inventory';
+  LayoutDashboard,
+  ClipboardCheck,
+  PackageCheck,
+  ShieldUser,
+  ListTodo,
+  Store,
+  ClipboardList,
+  Users,
+} from "lucide-react";
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-    const { loggedIn, loading } = useAuth();
-    if (loading) return <Loading />;
-    return loggedIn ? children : <Navigate to="/login" />;
-}
+import Administration from "./components/views/Administration";
+import Loading from "./components/views/Loading";
+import PendingIndents from "./components/views/PendingIndents";
+import Inventory from "./components/views/Inventory";
+import CreateIndent from "./components/views/CreateIndent";
+import UserIndent from "./components/views/UserIndent";
+import UserIndentListIndent from "./components/views/UserIndentListIndent";
+import UserIndentListRequisition from "./components/views/UserIndentListRequisition";
+import ApprowIndentData from "./components/views/ApprowIndentData";
 
-function GatedRoute({
-    children,
-    identifier,
-}: {
-    children: React.ReactNode;
-    identifier?: keyof UserPermissions;
-}) {
-    const { user } = useAuth();
-    if (!identifier) return children;
-    if (!user[identifier]) {
-        return <Navigate to="/" replace />;
-    }
-    return children;
-}
-
-const routes: RouteAttributes[] = [
-    {
-        path: '',
-        name: 'Dashboard',
-        icon: <LayoutDashboard size={20} />,
-        element: <Dashboard />,
-        notifications: () => 0,
-    },
-        {
-        path: '/inventory',
-        name: 'Inventory',
-        icon: <Store size={20} />,
-        element: <Inventory />,
-        notifications: () => 0,
-    },
-    {
-        path: 'create-indent',
-        gateKey: 'createIndent',
-        name: 'Create Indent',
-        icon: <ClipboardList size={20} />,
-        element: <CreateIndent />,
-        notifications: () => 0,
-    },
-    {
-        path: 'approve-indent',
-        gateKey: 'indentApprovalView',
-        name: 'Approve Indent',
-        icon: <ClipboardCheck size={20} />,
-        element: <ApproveIndent />,
-        notifications: (sheets) =>
-            sheets.filter(
-                (sheet) =>
-                    sheet.planned1 !== '' &&
-                    sheet.vendorType === '' &&
-                    sheet.indentType === 'Purchase'
-            ).length,
-    },
-    {
-        path: 'vendor-rate-update',
-        gateKey: 'updateVendorView',
-        name: 'Vendor Rate Update',
-        icon: <UserCheck size={20} />,
-        element: <VendorUpdate />,
-        notifications: (sheets) =>
-            sheets.filter((sheet) => sheet.planned2 !== '' && sheet.actual2 === '').length,
-    },
-    {
-        path: 'three-party-approval',
-        gateKey: 'threePartyApprovalView',
-        name: 'Three Party Approval',
-        icon: <Users size={20} />,
-        element: <RateApproval />,
-        notifications: (sheets) =>
-            sheets.filter(
-                (sheet) =>
-                    sheet.planned3 !== '' &&
-                    sheet.actual3 === '' &&
-                    sheet.vendorType === 'Three Party'
-            ).length,
-    },
-    {
-        path: 'pending-pos',
-        gateKey: 'pendingIndentsView',
-        name: 'Pending POs',
-        icon: <ListTodo size={20} />,
-        element: <PendingIndents />,
-        notifications: (sheets) =>
-            sheets.filter((sheet) => sheet.planned4 !== '' && sheet.actual4 === '').length,
-    },
-    {
-        path: 'create-po',
-        gateKey: 'createPo',
-        name: 'Create PO',
-        icon: <FilePlus2 size={20} />,
-        element: <CreatePO />,
-        notifications: () => 0,
-    },
-    {
-        path: 'po-history',
-        gateKey: 'ordersView',
-        name: 'PO History',
-        icon: <Package2 size={20} />,
-        element: <Order />,
-        notifications: () => 0,
-    },
-    {
-        path: 'receive-items',
-        gateKey: 'receiveItemView',
-        name: 'Receive Items',
-        icon: <Truck size={20} />,
-        element: <ReceiveItems />,
-        notifications: (sheets) =>
-            sheets.filter((sheet) => sheet.planned5 !== '' && sheet.actual5 === '').length,
-    },
-
-    {
-        path: 'store-out-approval',
-        gateKey: 'storeOutApprovalView',
-        name: 'Store Out Approval',
-        icon: <PackageCheck size={20} />,
-        element: <StoreOutApproval />,
-        notifications: (sheets) =>
-            sheets.filter(
-                (sheet) =>
-                    sheet.planned6 !== '' &&
-                    sheet.actual6 === '' &&
-                    sheet.indentType === 'Store Out'
-            ).length,
-    },
-    {
-        path: 'administration',
-        gateKey: 'administrate',
-        name: 'Adminstration',
-        icon: <ShieldUser size={20} />,
-        element: <Administration />,
-        notifications: () => 0,
-    },
+// ---------- ADMIN ROUTES ----------
+const adminRoutes: RouteAttributes[] = [
+  { path: "", name: "Dashboard", icon: <LayoutDashboard size={20} />, element: <Dashboard />, notifications: () => 0 },
+  { path: "inventory", name: "Inventory", icon: <Store size={20} />, element: <Inventory />, notifications: () => 0 },
+  { path: "create-indent", name: "Create Indent", icon: <ClipboardList size={20} />, element: <CreateIndent />, notifications: () => 0 },
+  {
+    path: "indent",
+    name: "Indent",
+    icon: <ClipboardCheck size={20} />,
+    element: <ApproveIndent />,
+    notifications: (sheets) =>
+      (sheets as Array<Record<string, unknown>>).filter(
+        (sheet) =>
+          String(sheet["planned1"] ?? "") !== "" &&
+          String(sheet["vendorType"] ?? "") === "" &&
+          (typeof sheet["indentType"] === "string" &&
+            sheet["indentType"] === "Purchase")
+      ).length,
+  },
+  { path: "pending-pos", name: "Purchase Order", icon: <ListTodo size={20} />, element: <PendingIndents />, notifications: () => 0 },
+  {
+    path: "store-out-approval",
+    name: "Store Out Approval",
+    icon: <PackageCheck size={20} />,
+    element: <StoreOutApproval />,
+    notifications: (sheets) =>
+      (sheets as Array<Record<string, unknown>>).filter(
+        (sheet) =>
+          String(sheet["planned6"] ?? "") !== "" &&
+          String(sheet["actual6"] ?? "") === "" &&
+          (typeof sheet["indentType"] === "string" &&
+            sheet["indentType"] === "Store Out")
+      ).length,
+  },
+  { path: "administration", name: "Administration", icon: <ShieldUser size={20} />, element: <Administration />, notifications: () => 0 },
+  {
+    path: "approve-indent-data",
+    name: "Approve Indent Data",
+    icon: <ClipboardCheck size={20} />,
+    element: <ApprowIndentData />,
+    notifications: () => 0,
+  },
+  
 ];
 
-createRoot(document.getElementById('root')!).render(
-    <StrictMode>
-        <AuthProvider>
-            <BrowserRouter>
-                <Routes>
-                    <Route path="/login" element={<Login />} />
-                    <Route
-                        path="/"
-                        element={
-                            <ProtectedRoute>
-                                <SheetsProvider>
-                                    <App routes={routes} />
-                                </SheetsProvider>
-                            </ProtectedRoute>
-                        }
-                    >
-                        {routes.map(({ path, element, gateKey }) => (
-                            <Route
-                                path={path}
-                                element={<GatedRoute identifier={gateKey}>{element}</GatedRoute>}
-                            />
-                        ))}
-                        <Route path="*" element={<Navigate to="/" replace />} />
-                    </Route>
-                </Routes>
-            </BrowserRouter>
-        </AuthProvider>
-    </StrictMode>
+// ---------- USER ROUTES ----------
+const userRoutes: RouteAttributes[] = [
+  { path: "user-indent", name: "Indent", icon: <Users size={20} />, element: <UserIndentListIndent />, notifications: () => 0 },
+  { path: "user-requisition", name: "Requisition", icon: <ClipboardList size={20} />, element: <UserIndentListRequisition />, notifications: () => 0 },
+  { path: "user-indent/create", name: "Create Indent", icon: <ClipboardList size={20} />, element: <UserIndent />, notifications: () => 0 },
+];
+
+// ---------- HELPERS ----------
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { loggedIn, loading } = useAuth();
+  if (loading) return <Loading />;
+  if (!loggedIn) return <Navigate to="/login" replace />;
+  return children;
+}
+
+function GatedRoute({ children }: { children: React.ReactNode }) {
+  return children;
+}
+
+// ---------- ROOT ROUTER ----------
+function RootWithAuthRoutes() {
+  const { role, employee_id } = useAuth();
+  const isAdmin = role === "admin";
+
+  // special employees override everything
+  const isStoreOutOnly = employee_id === "S07632" || employee_id === "S08088";
+  const isApproveIndentOnly = employee_id === "S00116";
+
+  return (
+    <Routes>
+      <Route path="/login" element={<Login />} />
+      <Route
+        path="/"
+        element={
+          <ProtectedRoute>
+            <SheetsProvider>
+              <App
+                routes={
+                  isStoreOutOnly
+                    ? [
+                        {
+                          path: "store-out-approval",
+                          name: "Store Out Approval",
+                          icon: <PackageCheck size={20} />,
+                          element: <StoreOutApproval />,
+                          notifications: () => 0,
+                        },
+                      ]
+                    : isApproveIndentOnly
+                    ? [
+                        {
+                          path: "approve-indent-data",
+                          name: "Approve Indent Data",
+                          icon: <ClipboardCheck size={20} />,
+                          element: <ApprowIndentData />,
+                          notifications: () => 0,
+                        },
+                      ]
+                    : isAdmin
+                    ? adminRoutes
+                    : userRoutes
+                }
+              />
+            </SheetsProvider>
+          </ProtectedRoute>
+        }
+      >
+        {isStoreOutOnly ? (
+          <>
+            <Route index element={<Navigate to="store-out-approval" replace />} />
+            <Route path="store-out-approval" element={<StoreOutApproval />} />
+            <Route path="*" element={<Navigate to="store-out-approval" replace />} />
+          </>
+        ) : isApproveIndentOnly ? (
+          <>
+            <Route index element={<Navigate to="approve-indent-data" replace />} />
+            <Route path="approve-indent-data" element={<ApprowIndentData />} />
+            <Route path="*" element={<Navigate to="approve-indent-data" replace />} />
+          </>
+        ) : (
+          <>
+            {(isAdmin ? adminRoutes : userRoutes).map(({ path, element }) => (
+              <Route key={path} path={path} element={<GatedRoute>{element}</GatedRoute>} />
+            ))}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </>
+        )}
+      </Route>
+    </Routes>
+  );
+}
+
+// ---------- MOUNT ----------
+createRoot(document.getElementById("root")!).render(
+  <StrictMode>
+    <AuthProvider>
+      <BrowserRouter>
+        <RootWithAuthRoutes />
+      </BrowserRouter>
+    </AuthProvider>
+  </StrictMode>
 );

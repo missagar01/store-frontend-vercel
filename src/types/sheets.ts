@@ -2,22 +2,28 @@ export type Sheet = 'INDENT' | 'RECEIVED' | 'MASTER' | 'USER' | 'PO MASTER' | "I
 
 export type IndentSheet = {
     timestamp: string;
-    indentNumber: string;
-    indenterName: string;
+    requestNumber: string;
+    indentSeries: string;
+    requesterName: string;
     department: string;
+    division: string;
     itemCode: string;
-    groupHead: string;
+    // groupHead: string;
     productName: string;
-    quantity: number;
+    requestQty: number;
     uom: string;
     specifications: string;
-    indentApprovedBy: string;
-    indentType: string;
-    attachment: string;
+    make: string;
+    // indentApprovedBy: string;
+    purpose: string;
+    costLocation: string;
+    // indentType: string;
+    // attachment: string;
+    formType: string;
     planned1: string;
     actual1: string;
     timeDelay1: string;
-    vendorType: string;
+    requestStatus: string;
     approvedQuantity: number;
     planned2: string;
     actual2: string;
@@ -207,6 +213,7 @@ export type UserPermissions = {
     storeOutApprovalAction: boolean;
     pendingIndentsView: boolean;
     ordersView: boolean;
+    userIndent: boolean; // User indent permission
 };
 
 export const allPermissionKeys = [
@@ -225,4 +232,5 @@ export const allPermissionKeys = [
     "storeOutApprovalAction",
     "pendingIndentsView",
     "ordersView",
+    "userIndent",
 ] as const;

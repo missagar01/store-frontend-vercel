@@ -80,11 +80,9 @@ export default function DataTable<TData, TValue>({
                 {children && children}
             </div>
             <div className="relative max-w-full overflow-x-auto">
-                <Table>
-                        <ScrollArea
-                            className={cn('rounded-sm border h-[74dvh] w-full', className)}
-                        >
-                    <TableHeader className="sticky top-0 z-10 bg-muted">
+                <ScrollArea className={cn('rounded-sm border h-[74dvh] w-full', className)}>
+                    <Table>
+                        <TableHeader className="sticky top-0 z-10 bg-muted">
                         {table.getHeaderGroups().map((headerGroup) => (
                             <TableRow key={headerGroup.id}>
                                 {headerGroup.headers.map((header) => {
@@ -101,8 +99,8 @@ export default function DataTable<TData, TValue>({
                                 })}
                             </TableRow>
                         ))}
-                    </TableHeader>
-                    <TableBody>
+                        </TableHeader>
+                        <TableBody>
                             {dataLoading ? (
                                 Array.from({ length: 15 }).map((_, i) => (
                                     <TableRow
@@ -148,9 +146,9 @@ export default function DataTable<TData, TValue>({
                                     </TableCell>
                                 </TableRow>
                             )}
-                    </TableBody>
-                        </ScrollArea>
-                </Table>
+                        </TableBody>
+                    </Table>
+                </ScrollArea>
             </div>
         </div>
     );

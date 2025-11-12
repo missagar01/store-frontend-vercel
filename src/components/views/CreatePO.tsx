@@ -31,7 +31,9 @@ import POPdf, { type POPdfProps } from '../element/POPdf';
 function generatePoNumber(poNumbers: string[], today = new Date()): string {
     // Step 1: Get financial year from today's date
     const fyStart = today.getMonth() < 3 ? today.getFullYear() - 1 : today.getFullYear();
-    const fy = `${(fyStart % 100).toString().padStart(2, '0')}-${((fyStart + 1) % 100).toString().padStart(2, '0')}`;
+    const fy = `${(fyStart % 100).toString().padStart(2, '0')}-${((fyStart + 1) % 100)
+        .toString()
+        .padStart(2, '0')}`;
 
     const prefix = `STMT/STORES/${fy}/`;
 
@@ -91,10 +93,15 @@ function filterUniquePoNumbers(data: PoMasterSheet[]): PoMasterSheet[] {
 }
 
 export default () => {
-    const { indentSheet, poMasterSheet, updateIndentSheet, updatePoMasterSheet, masterSheet: details } = useSheets();
+    const {
+        indentSheet,
+        poMasterSheet,
+        updateIndentSheet,
+        updatePoMasterSheet,
+        masterSheet: details,
+    } = useSheets();
     const [readOnly, setReadOnly] = useState(-1);
     const [mode, setMode] = useState<'create' | 'revise'>('create');
-
 
     const schema = z.object({
         poNumber: z.string().nonempty(),
@@ -542,8 +549,8 @@ export default () => {
                                                         value={
                                                             field.value
                                                                 ? field.value
-                                                                    .toISOString()
-                                                                    .split('T')[0]
+                                                                      .toISOString()
+                                                                      .split('T')[0]
                                                                 : ''
                                                         }
                                                         onChange={(e) =>
@@ -587,14 +594,22 @@ export default () => {
                                                                         indentSheet
                                                                             .filter(
                                                                                 (i) =>
-                                                                                    i.approvedVendorName !== '' &&
-                                                                                    i.planned4 !== '' &&
+                                                                                    i.approvedVendorName !==
+                                                                                        '' &&
+                                                                                    i.planned4 !==
+                                                                                        '' &&
                                                                                     i.actual4 === ''
                                                                             )
-                                                                            .map((i) => [i.approvedVendorName, i]) // Use approvedVendorName as the key
-                                                                    ).values()
+                                                                            .map((i) => [
+                                                                                i.approvedVendorName,
+                                                                                i,
+                                                                            ]) // Use approvedVendorName as the key
+                                                                    ).values(),
                                                                 ].map((i, k) => (
-                                                                    <SelectItem key={k} value={i.approvedVendorName}>
+                                                                    <SelectItem
+                                                                        key={k}
+                                                                        value={i.approvedVendorName}
+                                                                    >
                                                                         {i.approvedVendorName}
                                                                     </SelectItem>
                                                                 ))}
@@ -682,8 +697,8 @@ export default () => {
                                                         value={
                                                             field.value
                                                                 ? field.value
-                                                                    .toISOString()
-                                                                    .split('T')[0]
+                                                                      .toISOString()
+                                                                      .split('T')[0]
                                                                 : ''
                                                         }
                                                         onChange={(e) =>
@@ -729,8 +744,8 @@ export default () => {
                                                         value={
                                                             field.value
                                                                 ? field.value
-                                                                    .toISOString()
-                                                                    .split('T')[0]
+                                                                      .toISOString()
+                                                                      .split('T')[0]
                                                                 : ''
                                                         }
                                                         onChange={(e) =>
@@ -1039,7 +1054,9 @@ export default () => {
                                                             setReadOnly(index);
                                                         } else {
                                                             toast.error(
-                                                                `Please save term ${readOnly + 1} before editing`
+                                                                `Please save term ${
+                                                                    readOnly + 1
+                                                                } before editing`
                                                             );
                                                         }
                                                     }}
@@ -1080,7 +1097,9 @@ export default () => {
                                                     setReadOnly(termsArray.fields.length);
                                                 } else {
                                                     toast.error(
-                                                        `Please save term ${readOnly + 1} before creating`
+                                                        `Please save term ${
+                                                            readOnly + 1
+                                                        } before creating`
                                                     );
                                                 }
                                             } else {
