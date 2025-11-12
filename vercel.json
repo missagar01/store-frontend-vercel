@@ -1,11 +1,11 @@
 {
   "rewrites": [
     {
-      "source": "/api/:path*",       // Proxy all /api requests
+      "source": "/api/:path*",
       "destination": "http://3.6.126.4/:path*"
     },
     {
-      "source": "/(.*)",             // SPA routing for frontend
+      "source": "/(.*)",
       "destination": "/index.html"
     }
   ]
