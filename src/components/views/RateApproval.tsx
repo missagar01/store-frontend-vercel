@@ -25,9 +25,10 @@ import { Users } from 'lucide-react';
 import { Tabs, TabsContent } from '../ui/tabs';
 import Heading from '../element/Heading';
 import { Input } from '../ui/input';
-
+import { API_URL } from '@/api';
 // 👇 NEW: API calls to your Oracle backend
-const API_BASE = "http://3.6.126.4:3004/three-party-approval";
+const API_BASE = `${API_URL}/three-party-approval`;
+
 
 async function fetchPendingApprovals() {
   const res = await fetch(`${API_BASE}/pending`);

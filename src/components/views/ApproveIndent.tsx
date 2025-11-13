@@ -33,7 +33,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { API_URL } from '@/api'; // http://localhost:3004
 
 // 👇 if your approve API is on 3002 keep separate base here
-const APPROVE_API_BASE = 'http://localhost:3004';
+const APPROVE_API_BASE = `${API_URL}/three-party-approval`;
 
 interface IndentRow {
   PLANNEDTIMESTAMP?: string | null;
