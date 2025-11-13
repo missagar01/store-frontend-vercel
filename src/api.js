@@ -1,5 +1,7 @@
 // src/api.js
-export const API_URL = "http://3.6.126.4";  
+// export const API_URL = "http://3.6.126.4:3004";  
+// export const API_URL = import.meta.env.VITE_API_URL || "http://3.6.126.4:3004";
+export const API_URL = import.meta.env.VITE_API_URL || "/api";
 // export const API_URL = "https://store-backend-render-4.onrender.com"; 
 // Check if token is expired
 // export const API_URL = "http://16.171.35.43:3004/auth/login";  

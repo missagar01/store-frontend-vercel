@@ -27,7 +27,7 @@ import Heading from '../element/Heading';
 import { Input } from '../ui/input';
 
 // 👇 NEW: API calls to your Oracle backend
-const API_BASE = "http://localhost:3002/three-party-approval";
+const API_BASE = "http://3.6.126.4:3004/three-party-approval";
 
 async function fetchPendingApprovals() {
   const res = await fetch(`${API_BASE}/pending`);

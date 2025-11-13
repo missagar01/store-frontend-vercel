@@ -93,7 +93,7 @@ export default () => {
                     attachment: product.attachment ? product.attachment.name : null,
                 };
 
-                const res = await fetch('http://localhost:3002/store-indent', {
+                const res = await fetch('http://3.6.126.4/store-indent', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(row),
