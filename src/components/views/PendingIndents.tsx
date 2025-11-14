@@ -1,13 +1,13 @@
-import { useEffect, useState } from 'react';
-import type { ColumnDef } from '@tanstack/react-table';
-import { ListTodo, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useEffect, useState } from "react";
+import { ListTodo, ChevronLeft, ChevronRight } from "lucide-react";
 
-import Heading from '../element/Heading';
-import DataTable from '../element/DataTable';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
-import { API_URL } from '@/api';
-import { toast } from 'sonner';
+import Heading from "../element/Heading";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { API_URL } from "@/api";
+import { toast } from "sonner";
+import { PuffLoader as Loader } from "react-spinners";
 
 interface POData {
   PLANNED_TIMESTAMP: string;
@@ -23,6 +23,9 @@ interface POData {
 
 const PAGE_SIZE = 50;
 
+/* =========================
+   Pagination Bar – 3 buttons (1,2,3 style)
+   ========================= */
 interface PaginationBarProps {
   currentPage: number;
   totalItems: number;
@@ -30,7 +33,6 @@ interface PaginationBarProps {
   onPageChange: (page: number) => void;
 }
 
-// 🔹 PaginationBar – max 3 buttons (1,2,3 style)
 function PaginationBar({
   currentPage,
   totalItems,
@@ -44,34 +46,29 @@ function PaginationBar({
   const endIndex = Math.min(currentPage * pageSize, totalItems);
 
   const pages: number[] = [];
-  // 👉 Only 3 buttons: e.g. 1-2-3, 4-5-6, etc.
   let start = Math.max(1, currentPage - 1);
   let end = Math.min(totalPages, start + 2);
   start = Math.max(1, end - 2);
 
-  for (let i = start; i <= end; i++) {
-    pages.push(i);
-  }
+  for (let i = start; i <= end; i++) pages.push(i);
 
   return (
-    <div className="flex items-center justify-between mt-3 text-sm text-muted-foreground">
-      {/* Left: summary */}
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mt-3 text-sm text-muted-foreground">
       <span>
-        Showing{' '}
+        Showing{" "}
         <span className="font-semibold">
-          {startIndex.toLocaleString('en-IN')}
+          {startIndex.toLocaleString("en-IN")}
         </span>
         –
         <span className="font-semibold">
-          {endIndex.toLocaleString('en-IN')}
-        </span>{' '}
-        of{' '}
+          {endIndex.toLocaleString("en-IN")}
+        </span>{" "}
+        of{" "}
         <span className="font-semibold">
-          {totalItems.toLocaleString('en-IN')}
+          {totalItems.toLocaleString("en-IN")}
         </span>
       </span>
 
-      {/* Right: buttons */}
       <div className="flex items-center gap-1">
         <Button
           variant="ghost"
@@ -85,7 +82,7 @@ function PaginationBar({
         {pages.map((p) => (
           <Button
             key={p}
-            variant={p === currentPage ? 'default' : 'outline'}
+            variant={p === currentPage ? "default" : "outline"}
             size="icon"
             onClick={() => onPageChange(p)}
           >
@@ -106,175 +103,170 @@ function PaginationBar({
   );
 }
 
-const formatDate = (dateString: string) => {
-  if (!dateString) return '';
-  return new Date(dateString).toLocaleDateString('en-GB');
-};
-
-const formatDateTime = (dateString: string) => {
-  if (!dateString) return '';
-  return new Date(dateString).toLocaleString('en-GB', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
+/* =========================
+   Helpers
+   ========================= */
+const formatDate = (dateString?: string) => {
+  if (!dateString) return "";
+  return new Date(dateString).toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
   });
 };
 
-// 🔹 Helper: always send token + handle error
-async function fetchWithToken(path: string) {
-  const token = localStorage.getItem('token');
-  const headers: HeadersInit = {};
+const formatDateTime = (dateString?: string) => {
+  if (!dateString) return "";
+  return new Date(dateString).toLocaleString("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+};
 
+// 🔹 API helper – token ke saath
+async function fetchWithToken(path: string) {
+  const token = localStorage.getItem("token");
+  const headers: HeadersInit = {};
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
-
   const res = await fetch(`${API_URL}${path}`, { headers });
-  if (!res.ok) {
-    throw new Error(`Failed to fetch ${path}`);
-  }
+  if (!res.ok) throw new Error(`Failed to fetch ${path}`);
   return res.json();
 }
 
-// 🔹 Normalize one row
-const normalize = (po: Partial<POData>): POData => ({
-  PLANNED_TIMESTAMP: po.PLANNED_TIMESTAMP ?? '',
-  VRNO: po.VRNO ?? '',
-  VRDATE: po.VRDATE ?? '',
-  VENDOR_NAME: po.VENDOR_NAME ?? '',
-  ITEM_NAME: po.ITEM_NAME ?? '',
-  UM: po.UM ?? '',
-  QTYORDER: po.QTYORDER ?? 0,
-  QTYEXECUTE: po.QTYEXECUTE ?? 0,
-  BALANCE_QTY:
-    po.BALANCE_QTY ??
-    Math.max((po.QTYORDER ?? 0) - (po.QTYEXECUTE ?? 0), 0),
-});
+// 🔹 Normalize ek row – null / undefined safe
+const normalize = (po: Partial<POData>): POData => {
+  const order = po.QTYORDER ?? 0;
+  const exec = po.QTYEXECUTE ?? 0;
+  const balance =
+    po.BALANCE_QTY != null ? po.BALANCE_QTY : Math.max(order - exec, 0);
+
+  return {
+    PLANNED_TIMESTAMP: po.PLANNED_TIMESTAMP ?? "",
+    VRNO: po.VRNO ?? "",
+    VRDATE: po.VRDATE ?? "",
+    VENDOR_NAME: po.VENDOR_NAME ?? "",
+    ITEM_NAME: po.ITEM_NAME ?? "",
+    UM: po.UM ?? "",
+    QTYORDER: order,
+    QTYEXECUTE: exec,
+    BALANCE_QTY: balance,
+  };
+};
 
 export default function PurchaseOrders() {
-  const [pendingPOs, setPendingPOs] = useState<POData[]>([]);
-  const [historyPOs, setHistoryPOs] = useState<POData[]>([]);
+  // ✅ FULL data from backend (NO backend pagination)
+  const [pendingAll, setPendingAll] = useState<POData[]>([]);
+  const [historyAll, setHistoryAll] = useState<POData[]>([]);
+
+  // search + pagination state
+  const [pendingSearch, setPendingSearch] = useState("");
+  const [historySearch, setHistorySearch] = useState("");
+  const [pendingPage, setPendingPage] = useState(1);
+  const [historyPage, setHistoryPage] = useState(1);
+
   const [loading, setLoading] = useState(false);
 
-  // 🔹 pagination state
-  const [pendingPage, setPendingPage] = useState(1);
-  const [pendingTotal, setPendingTotal] = useState(0);
-  const [historyPage, setHistoryPage] = useState(1);
-  const [historyTotal, setHistoryTotal] = useState(0);
+  /* =========================
+     Fetch: FULL LISTS
+     ========================= */
+  async function fetchPendingAll() {
+    const json = await fetchWithToken(`/po/pending`);
+    const rows = Array.isArray(json.data) ? json.data : [];
+    setPendingAll(rows.map(normalize));
+    setPendingPage(1);
+  }
 
-  // 🔹 pending page fetch (server-side)
-  async function fetchPending(page = 1) {
+  async function fetchHistoryAll() {
+    const json = await fetchWithToken(`/po/history`);
+    const rows = Array.isArray(json.data) ? json.data : [];
+    setHistoryAll(rows.map(normalize));
+    setHistoryPage(1);
+  }
+
+  async function fetchInitial() {
     try {
       setLoading(true);
-      const json = await fetchWithToken(
-        `/po/pending?page=${page}&pageSize=${PAGE_SIZE}`
-      );
-
-      const rows = Array.isArray(json.data) ? json.data : [];
-      setPendingPOs(rows.map(normalize));
-      setPendingPage(json.page ?? page);
-      setPendingTotal(json.total ?? rows.length);
+      await Promise.all([fetchPendingAll(), fetchHistoryAll()]);
     } catch (err) {
-      console.error('Error fetching pending POs:', err);
-      toast.error('Failed to fetch pending POs');
+      console.error(err);
+      toast.error("Failed to fetch purchase orders");
     } finally {
       setLoading(false);
     }
   }
 
-  // 🔹 history page fetch (server-side)
-  async function fetchHistory(page = 1) {
-    try {
-      setLoading(true);
-      const json = await fetchWithToken(
-        `/po/history?page=${page}&pageSize=${PAGE_SIZE}`
-      );
-
-      const rows = Array.isArray(json.data) ? json.data : [];
-      setHistoryPOs(rows.map(normalize));
-      setHistoryPage(json.page ?? page);
-      setHistoryTotal(json.total ?? rows.length);
-    } catch (err) {
-      console.error('Error fetching PO history:', err);
-      toast.error('Failed to fetch PO history');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // 🔹 Initial load: page 1 for both tabs (fast parallel)
   useEffect(() => {
-    (async () => {
-      try {
-        setLoading(true);
-        await Promise.all([fetchPending(1), fetchHistory(1)]);
-      } finally {
-        setLoading(false);
-      }
-    })();
+    fetchInitial();
   }, []);
 
-  // 🔹 Columns with GLOBAL S.No (depends on current page)
-  const pendingColumns: ColumnDef<POData>[] = [
-    {
-      header: 'S.No',
-      cell: ({ row }) => (pendingPage - 1) * PAGE_SIZE + row.index + 1,
-      enableSorting: false,
-      size: 60,
-    },
-    {
-      accessorKey: 'PLANNED_TIMESTAMP',
-      header: 'Planned Time Stamp',
-      cell: ({ row }) => formatDateTime(row.original.PLANNED_TIMESTAMP),
-    },
-    { accessorKey: 'VRNO', header: 'PO No.' },
-    {
-      accessorKey: 'VRDATE',
-      header: 'PO Date',
-      cell: ({ row }) => formatDate(row.original.VRDATE),
-    },
-    { accessorKey: 'VENDOR_NAME', header: 'Vendor Name' },
-    { accessorKey: 'ITEM_NAME', header: 'Item Name' },
-    { accessorKey: 'UM', header: 'UOM' },
-    { accessorKey: 'QTYORDER', header: 'Ordered Qty' },
-    { accessorKey: 'QTYEXECUTE', header: 'Executed Qty' },
-    { accessorKey: 'BALANCE_QTY', header: 'Balance Qty' },
-  ];
+  /* =========================
+     FILTER + PAGINATION (PENDING)
+     ========================= */
+  const pendingQuery = pendingSearch.trim().toLowerCase();
+  const pendingFiltered = pendingQuery
+    ? pendingAll.filter((row) => {
+        const q = pendingQuery;
+        return (
+          (row.VRNO || "").toLowerCase().includes(q) ||
+          (row.VENDOR_NAME || "").toLowerCase().includes(q) ||
+          (row.ITEM_NAME || "").toLowerCase().includes(q)
+        );
+      })
+    : pendingAll;
 
-  const historyColumns: ColumnDef<POData>[] = [
-    {
-      header: 'S.No',
-      cell: ({ row }) => (historyPage - 1) * PAGE_SIZE + row.index + 1,
-      enableSorting: false,
-      size: 60,
-    },
-    {
-      accessorKey: 'PLANNED_TIMESTAMP',
-      header: 'Planned Time Stamp',
-      cell: ({ row }) => formatDateTime(row.original.PLANNED_TIMESTAMP),
-    },
-    { accessorKey: 'VRNO', header: 'PO No.' },
-    {
-      accessorKey: 'VRDATE',
-      header: 'PO Date',
-      cell: ({ row }) => formatDate(row.original.VRDATE),
-    },
-    { accessorKey: 'VENDOR_NAME', header: 'Vendor Name' },
-    { accessorKey: 'ITEM_NAME', header: 'Item Name' },
-    { accessorKey: 'UM', header: 'UOM' },
-    { accessorKey: 'QTYORDER', header: 'Ordered Qty' },
-    { accessorKey: 'QTYEXECUTE', header: 'Executed Qty' },
-    { accessorKey: 'BALANCE_QTY', header: 'Balance Qty' },
-  ];
+  const pendingTotal = pendingFiltered.length;
+  const pendingTotalPages = Math.max(
+    1,
+    Math.ceil(pendingTotal / PAGE_SIZE) || 1
+  );
+  const pendingCurrentPage = Math.min(pendingPage, pendingTotalPages);
+  const pendingStartIndex = (pendingCurrentPage - 1) * PAGE_SIZE;
+  const pendingPageRows = pendingFiltered.slice(
+    pendingStartIndex,
+    pendingStartIndex + PAGE_SIZE
+  );
 
+  /* =========================
+     FILTER + PAGINATION (HISTORY)
+     ========================= */
+  const historyQuery = historySearch.trim().toLowerCase();
+  const historyFiltered = historyQuery
+    ? historyAll.filter((row) => {
+        const q = historyQuery;
+        return (
+          (row.VRNO || "").toLowerCase().includes(q) ||
+          (row.VENDOR_NAME || "").toLowerCase().includes(q) ||
+          (row.ITEM_NAME || "").toLowerCase().includes(q)
+        );
+      })
+    : historyAll;
+
+  const historyTotal = historyFiltered.length;
+  const historyTotalPages = Math.max(
+    1,
+    Math.ceil(historyTotal / PAGE_SIZE) || 1
+  );
+  const historyCurrentPage = Math.min(historyPage, historyTotalPages);
+  const historyStartIndex = (historyCurrentPage - 1) * PAGE_SIZE;
+  const historyPageRows = historyFiltered.slice(
+    historyStartIndex,
+    historyStartIndex + PAGE_SIZE
+  );
+
+  /* =========================
+     RENDER
+     ========================= */
   return (
     <div className="p-4">
       <Heading
         heading="Purchase Orders"
-        subtext="Manage pending and received purchase orders"
+        subtext="Pending & Received purchase orders"
       >
         <ListTodo size={50} className="text-primary" />
       </Heading>
@@ -289,48 +281,230 @@ export default function PurchaseOrders() {
           </TabsTrigger>
         </TabsList>
 
-        {/* Pending Tab */}
+        {/* ========== PENDING TAB ========== */}
         <TabsContent value="pending">
-          <div className="overflow-x-auto">
-            <DataTable
-              data={pendingPOs}
-              columns={pendingColumns}
-              searchFields={['VRNO', 'VENDOR_NAME', 'ITEM_NAME']}
-              dataLoading={loading}
-              className="min-w-[900px] h-[75vh]"
-            />
-            <PaginationBar
-              currentPage={pendingPage}
-              totalItems={pendingTotal}
-              pageSize={PAGE_SIZE}
-              onPageChange={(page) => {
-                const safe = Math.max(1, page);
-                fetchPending(safe);
+          {/* Search – full width */}
+          <div className="mb-2">
+            <Input
+              placeholder="Search: PO No / Vendor / Item"
+              value={pendingSearch}
+              onChange={(e) => {
+                setPendingSearch(e.target.value);
+                setPendingPage(1);
               }}
+              className="w-full"
             />
           </div>
+
+          <div className="max-h-[70vh] overflow-auto border rounded-xl bg-white shadow-sm">
+            <table className="min-w-[1200px] text-xs border-collapse">
+              <thead className="sticky top-0 z-20 bg-slate-100">
+                <tr>
+                  {/* Sticky left: PO No. */}
+                  <th className="sticky left-0 z-30 bg-slate-100 border-b px-3 py-2 text-left font-semibold">
+                    PO No.
+                  </th>
+                  <th className="border-b px-3 py-2 text-center font-semibold">
+                    S.No
+                  </th>
+                  <th className="border-b px-3 py-2 font-semibold">
+                    Planned Time Stamp
+                  </th>
+                  <th className="border-b px-3 py-2 font-semibold">
+                    PO Date
+                  </th>
+                  <th className="border-b px-3 py-2 font-semibold">
+                    Vendor Name
+                  </th>
+                  <th className="border-b px-3 py-2 font-semibold">
+                    Item Name
+                  </th>
+                  <th className="border-b px-3 py-2 font-semibold">UOM</th>
+                  <th className="border-b px-3 py-2 font-semibold">
+                    Ordered Qty
+                  </th>
+                  <th className="border-b px-3 py-2 font-semibold">
+                    Executed Qty
+                  </th>
+                  <th className="border-b px-3 py-2 font-semibold">
+                    Balance Qty
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td
+                      colSpan={10}
+                      className="py-6 text-center text-slate-500 text-sm"
+                    >
+                      <div className="flex items-center justify-center gap-2">
+                        <Loader size={16} />
+                        Loading...
+                      </div>
+                    </td>
+                  </tr>
+                ) : pendingPageRows.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={10}
+                      className="py-6 text-center text-slate-400 text-sm"
+                    >
+                      No Pending POs Found
+                    </td>
+                  </tr>
+                ) : (
+                  pendingPageRows.map((row, index) => (
+                    <tr key={row.VRNO + index} className="hover:bg-slate-50">
+                      {/* Sticky PO No. */}
+                      <td className="sticky left-0 z-10 bg-white border-b px-3 py-1 text-left font-medium">
+                        {row.VRNO}
+                      </td>
+                      <td className="border-b px-2 py-1 text-center">
+                        {pendingStartIndex + index + 1}
+                      </td>
+                      <td className="border-b px-2 py-1">
+                        {formatDateTime(row.PLANNED_TIMESTAMP)}
+                      </td>
+                      <td className="border-b px-2 py-1">
+                        {formatDate(row.VRDATE)}
+                      </td>
+                      <td className="border-b px-2 py-1">
+                        {row.VENDOR_NAME}
+                      </td>
+                      <td className="border-b px-2 py-1">{row.ITEM_NAME}</td>
+                      <td className="border-b px-2 py-1">{row.UM}</td>
+                      <td className="border-b px-2 py-1">{row.QTYORDER}</td>
+                      <td className="border-b px-2 py-1">{row.QTYEXECUTE}</td>
+                      <td className="border-b px-2 py-1">
+                        {row.BALANCE_QTY ?? 0}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <PaginationBar
+            currentPage={pendingCurrentPage}
+            totalItems={pendingTotal}
+            pageSize={PAGE_SIZE}
+            onPageChange={(p) => setPendingPage(Math.max(1, p))}
+          />
         </TabsContent>
 
-        {/* Received / History Tab */}
+        {/* ========== RECEIVED / HISTORY TAB ========== */}
         <TabsContent value="received">
-          <div className="overflow-x-auto">
-            <DataTable
-              data={historyPOs}
-              columns={historyColumns}
-              searchFields={['VRNO', 'VENDOR_NAME', 'ITEM_NAME']}
-              dataLoading={loading}
-              className="min-w-[900px] h-[75vh]"
-            />
-            <PaginationBar
-              currentPage={historyPage}
-              totalItems={historyTotal}
-              pageSize={PAGE_SIZE}
-              onPageChange={(page) => {
-                const safe = Math.max(1, page);
-                fetchHistory(safe);
+          {/* Search – full width */}
+          <div className="mb-2">
+            <Input
+              placeholder="Search: PO No / Vendor / Item"
+              value={historySearch}
+              onChange={(e) => {
+                setHistorySearch(e.target.value);
+                setHistoryPage(1);
               }}
+              className="w-full"
             />
           </div>
+
+          <div className="max-h-[70vh] overflow-auto border rounded-xl bg-white shadow-sm">
+            <table className="min-w-[1200px] text-xs border-collapse">
+              <thead className="sticky top-0 z-20 bg-slate-100">
+                <tr>
+                  {/* Sticky PO No. */}
+                  <th className="sticky left-0 z-30 bg-slate-100 border-b px-3 py-2 text-left font-semibold">
+                    PO No.
+                  </th>
+                  <th className="border-b px-3 py-2 text-center font-semibold">
+                    S.No
+                  </th>
+                  <th className="border-b px-3 py-2 font-semibold">
+                    Planned Time Stamp
+                  </th>
+                  <th className="border-b px-3 py-2 font-semibold">
+                    PO Date
+                  </th>
+                  <th className="border-b px-3 py-2 font-semibold">
+                    Vendor Name
+                  </th>
+                  <th className="border-b px-3 py-2 font-semibold">
+                    Item Name
+                  </th>
+                  <th className="border-b px-3 py-2 font-semibold">UOM</th>
+                  <th className="border-b px-3 py-2 font-semibold">
+                    Ordered Qty
+                  </th>
+                  <th className="border-b px-3 py-2 font-semibold">
+                    Executed Qty
+                  </th>
+                  <th className="border-b px-3 py-2 font-semibold">
+                    Balance Qty
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td
+                      colSpan={10}
+                      className="py-6 text-center text-slate-500 text-sm"
+                    >
+                      <div className="flex items-center justify-center gap-2">
+                        <Loader size={16} />
+                        Loading...
+                      </div>
+                    </td>
+                  </tr>
+                ) : historyPageRows.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={10}
+                      className="py-6 text-center text-slate-400 text-sm"
+                    >
+                      No Received POs Found
+                    </td>
+                  </tr>
+                ) : (
+                  historyPageRows.map((row, index) => (
+                    <tr key={row.VRNO + index} className="hover:bg-slate-50">
+                      {/* Sticky PO No. */}
+                      <td className="sticky left-0 z-10 bg-white border-b px-3 py-1 text-left font-medium">
+                        {row.VRNO}
+                      </td>
+                      <td className="border-b px-2 py-1 text-center">
+                        {historyStartIndex + index + 1}
+                      </td>
+                      <td className="border-b px-2 py-1">
+                        {formatDateTime(row.PLANNED_TIMESTAMP)}
+                      </td>
+                      <td className="border-b px-2 py-1">
+                        {formatDate(row.VRDATE)}
+                      </td>
+                      <td className="border-b px-2 py-1">
+                        {row.VENDOR_NAME}
+                      </td>
+                      <td className="border-b px-2 py-1">{row.ITEM_NAME}</td>
+                      <td className="border-b px-2 py-1">{row.UM}</td>
+                      <td className="border-b px-2 py-1">{row.QTYORDER}</td>
+                      <td className="border-b px-2 py-1">{row.QTYEXECUTE}</td>
+                      <td className="border-b px-2 py-1">
+                        {row.BALANCE_QTY ?? 0}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <PaginationBar
+            currentPage={historyCurrentPage}
+            totalItems={historyTotal}
+            pageSize={PAGE_SIZE}
+            onPageChange={(p) => setHistoryPage(Math.max(1, p))}
+          />
         </TabsContent>
       </Tabs>
     </div>

@@ -1,8 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import Heading from "../element/Heading";
 import { Store, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
-import DataTable from "../element/DataTable";
-import type { ColumnDef } from "@tanstack/react-table";
 import axios from "axios";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
@@ -20,7 +18,7 @@ interface StockRow {
 
 const PAGE_SIZE = 50;
 
-/* 🔹 Simple Pagination (1,2,3 buttons only) */
+/* 🔹 Simple Pagination (1,2,3 buttons only) – CLIENT SIDE */
 function PaginationBar({
   page,
   total,
@@ -98,12 +96,15 @@ export default function StockReport() {
 
   const [fromDate, setFromDate] = useState(firstOfMonth);
   const [toDate, setToDate] = useState(todayStr);
-  const [data, setData] = useState<StockRow[]>([]);
+
+  // ✅ BACKEND se pura data (NO pagination backend)
+  const [allRows, setAllRows] = useState<StockRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // ✅ FRONTEND pagination + search
   const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
+  const [searchText, setSearchText] = useState("");
 
   // Convert YYYY-MM-DD → DD-MM-YYYY for backend
   const toBackendDate = (dateStr: string) => {
@@ -112,7 +113,7 @@ export default function StockReport() {
     return `${d}-${m}-${y}`;
   };
 
-  const fetchStock = async (pageToLoad = 1) => {
+  const fetchStock = async () => {
     if (!fromDate || !toDate) return;
     setLoading(true);
     setError(null);
@@ -121,13 +122,16 @@ export default function StockReport() {
       const fromParam = toBackendDate(fromDate);
       const toParam = toBackendDate(toDate);
 
-      const res = await axios.get(
-        `${API_URL}/stock?fromDate=${fromParam}&toDate=${toParam}&page=${pageToLoad}&pageSize=${PAGE_SIZE}`
-      );
+      const res = await axios.get(`${API_URL}/stock`, {
+        params: {
+          fromDate: fromParam,
+          toDate: toParam,
+        },
+      });
 
       const apiData = res.data;
       if (apiData?.success && Array.isArray(apiData.data)) {
-        const rows = apiData.data.map((r: any) => ({
+        const rows: StockRow[] = apiData.data.map((r: any) => ({
           itemCode: r.COL1?.trim() || "",
           itemName: r.COL2?.trim() || "",
           uom: r.COL3?.trim() || "",
@@ -135,86 +139,39 @@ export default function StockReport() {
           closingQty: parseFloat(r.COL5) || 0,
         }));
 
-        setData(rows);
-        setTotal(apiData.total ?? rows.length);
-        setPage(apiData.page ?? pageToLoad);
+        setAllRows(rows);
+        setPage(1); // naya data → page 1
       } else {
-        setData([]);
-        setTotal(0);
+        setAllRows([]);
+        setPage(1);
       }
     } catch (err: any) {
       console.error("Fetch error:", err);
       setError(err?.response?.data?.message || "Failed to fetch data");
-      setData([]);
-      setTotal(0);
+      setAllRows([]);
+      setPage(1);
     } finally {
       setLoading(false);
     }
   };
 
-  // Optional: load once on mount with default date range
-  // useEffect(() => {
-  //   fetchStock(1);
-  // }, []);
+  /* 🔍 GLOBAL SEARCH (poore data par) */
+  const q = searchText.trim().toLowerCase();
+  const filteredRows = q
+    ? allRows.filter((row) => {
+        const c1 = row.itemCode.toLowerCase();
+        const c2 = row.itemName.toLowerCase();
+        const c3 = row.uom.toLowerCase();
+        return c1.includes(q) || c2.includes(q) || c3.includes(q);
+      })
+    : allRows;
 
-  const columns: ColumnDef<StockRow>[] = [
-    {
-      header: "S.No",
-      // 🔹 Global S.No: page 1 → 1–50, page 2 → 51–100, ...
-      cell: ({ row }) => (page - 1) * PAGE_SIZE + row.index + 1,
-      enableSorting: false,
-      size: 60,
-    },
-    {
-      accessorKey: "itemCode",
-      header: () => <div className="text-center font-semibold">Item Code</div>,
-      cell: ({ row }) => (
-        <div className="text-center text-slate-700">
-          {row.original.itemCode}
-        </div>
-      ),
-    },
-    {
-      accessorKey: "itemName",
-      header: () => <div className="text-center font-semibold">Item Name</div>,
-      cell: ({ row }) => (
-        <div className="text-center text-slate-700">
-          {row.original.itemName}
-        </div>
-      ),
-    },
-    {
-      accessorKey: "uom",
-      header: () => <div className="text-center font-semibold">UOM</div>,
-      cell: ({ row }) => (
-        <div className="text-center text-slate-700">{row.original.uom}</div>
-      ),
-    },
-    {
-      accessorKey: "openingQty",
-      header: () => (
-        <div className="text-center font-semibold">Opening Qty</div>
-      ),
-      cell: ({ row }) => (
-        <div className="text-center">{row.original.openingQty}</div>
-      ),
-    },
-    {
-      accessorKey: "closingQty",
-      header: () => (
-        <div className="text-center font-semibold">Closing Qty</div>
-      ),
-      cell: ({ row }) =>
-        row.original.closingQty === 0 ? (
-          <div className="flex justify-center">
-            <Pill variant="reject">Out of Stock</Pill>
-          </div>
-        ) : (
-          <div className="text-center">{row.original.closingQty}</div>
-        ),
-    },
-  ];
+  const totalRecords = filteredRows.length;
+  const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
 
+  const startIndex = (currentPage - 1) * PAGE_SIZE;
+  const pagedRows = filteredRows.slice(startIndex, startIndex + PAGE_SIZE);
 
   return (
     <div className="space-y-4">
@@ -226,7 +183,7 @@ export default function StockReport() {
         <Store size={50} className="text-primary" />
       </Heading>
 
-      {/* Filters */}
+      {/* Filters – ONLY date filters */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col sm:flex-row sm:items-end gap-4 justify-between">
         <div className="flex flex-col sm:flex-row gap-4">
           <div>
@@ -251,7 +208,7 @@ export default function StockReport() {
 
         <div className="flex gap-2 items-center justify-between sm:justify-start">
           <Button
-            onClick={() => fetchStock(1)}
+            onClick={fetchStock}
             disabled={loading}
             className="mt-2 sm:mt-0"
           >
@@ -264,7 +221,9 @@ export default function StockReport() {
             onClick={() => {
               setFromDate(firstOfMonth);
               setToDate(todayStr);
-              fetchStock(1);
+              setSearchText("");
+              setPage(1);
+              fetchStock();
             }}
           >
             <RefreshCw className="w-4 h-4" />
@@ -272,12 +231,12 @@ export default function StockReport() {
         </div>
       </div>
 
-      {/* Record Count */}
+      {/* Record Count + Error */}
       <div className="flex justify-between items-center text-sm text-slate-500">
         <p>
           Showing{" "}
           <span className="font-semibold text-slate-700">
-            {total.toLocaleString("en-IN")}
+            {totalRecords.toLocaleString("en-IN")}
           </span>{" "}
           total records
         </p>
@@ -288,22 +247,90 @@ export default function StockReport() {
         )}
       </div>
 
-      {/* Data Table */}
-      <div className="bg-white rounded-xl shadow-md border border-slate-200 overflow-x-auto">
-        <DataTable
-          data={data}
-          columns={columns}
-          dataLoading={loading}
-          searchFields={["itemCode", "itemName", "uom"]}
-          className="h-[70dvh] min-w-full text-center"
-        />
+      {/* 🔍 Global Search – table ke upar right me */}
+      <div className="flex justify-end mb-2">
+        <div className="w-full sm:w-[280px]">
+          <Input
+            type="text"
+            placeholder="Search: Code / Name / UOM"
+            value={searchText}
+            onChange={(e) => {
+              setSearchText(e.target.value);
+              setPage(1);
+            }}
+          />
+        </div>
       </div>
 
-      {/* Pagination Bar */}
+      {/* NEW TABLE with sticky header */}
+      <div className="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden">
+        <div className="max-h-[70vh] overflow-auto relative">
+          <table className="min-w-full text-center border-collapse">
+            <thead className="sticky top-0 bg-slate-100 z-20">
+              <tr>
+                <th className="px-3 py-2 font-semibold border-b">S.No</th>
+                <th className="px-3 py-2 font-semibold border-b">Item Code</th>
+                <th className="px-3 py-2 font-semibold border-b">Item Name</th>
+                <th className="px-3 py-2 font-semibold border-b">UOM</th>
+                <th className="px-3 py-2 font-semibold border-b">
+                  Opening Qty
+                </th>
+                <th className="px-3 py-2 font-semibold border-b">
+                  Closing Qty
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td
+                    colSpan={6}
+                    className="py-6 text-center text-slate-500 text-sm"
+                  >
+                    Loading...
+                  </td>
+                </tr>
+              ) : pagedRows.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={6}
+                    className="py-6 text-center text-slate-400 text-sm"
+                  >
+                    No Data Found
+                  </td>
+                </tr>
+              ) : (
+                pagedRows.map((row, index) => (
+                  <tr key={index} className="hover:bg-slate-50">
+                    <td className="border-b px-2 py-1">
+                      {(currentPage - 1) * PAGE_SIZE + index + 1}
+                    </td>
+                    <td className="border-b px-2 py-1">{row.itemCode}</td>
+                    <td className="border-b px-2 py-1">{row.itemName}</td>
+                    <td className="border-b px-2 py-1">{row.uom}</td>
+                    <td className="border-b px-2 py-1">{row.openingQty}</td>
+                    <td className="border-b px-2 py-1">
+                      {row.closingQty === 0 ? (
+                        <span className="inline-flex items-center justify-center rounded-full bg-red-100 text-red-700 px-2 py-0.5 text-[11px]">
+                          Out of Stock
+                        </span>
+                      ) : (
+                        row.closingQty
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Pagination Bar – client-side */}
       <PaginationBar
-        page={page}
-        total={total}
-        onChange={(p) => fetchStock(p)}
+        page={currentPage}
+        total={totalRecords}
+        onChange={(p) => setPage(p)}
       />
 
       {/* Footer */}
