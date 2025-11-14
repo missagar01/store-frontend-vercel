@@ -1,16 +1,19 @@
 // src/api.js
 
 // 🔹 Decide BASE API URL based on environment (local vs production)
+// src/api.js
+
 const isLocalhost =
   typeof window !== "undefined" &&
   (window.location.hostname === "localhost" ||
     window.location.hostname === "127.0.0.1");
 
-// 🟢 Local dev (npm run dev): direct AWS backend
-// 🔵 Vercel / Production: use "/api" (Vercel rewrites → AWS)
+// 🟢 Local (npm run dev) → direct AWS backend
+// 🔵 Vercel / production → "/api" (rewrites → AWS)
 export const API_URL = isLocalhost
   ? (import.meta.env.VITE_API_URL || "http://3.6.126.4:3004")
   : "/api";
+
 
 // ================= AUTH HELPERS =================
 

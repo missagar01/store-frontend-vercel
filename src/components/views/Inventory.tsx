@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Heading from "../element/Heading";
-import { Store, RefreshCw } from "lucide-react";
+import { Store, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
 import DataTable from "../element/DataTable";
 import type { ColumnDef } from "@tanstack/react-table";
 import axios from "axios";
@@ -8,13 +8,84 @@ import { Input } from "../ui/input";
 import { Button } from "../ui/button";
 import { Pill } from "../ui/pill";
 
-import { API_URL } from '@/api';
+import { API_URL } from "@/api";
+
 interface StockRow {
   itemCode: string;
   itemName: string;
   uom: string;
   openingQty: number;
   closingQty: number;
+}
+
+const PAGE_SIZE = 50;
+
+/* 🔹 Simple Pagination (1,2,3 buttons only) */
+function PaginationBar({
+  page,
+  total,
+  onChange,
+}: {
+  page: number;
+  total: number;
+  onChange: (p: number) => void;
+}) {
+  if (!total) return null;
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  const pages: number[] = [];
+  const start = Math.max(1, page - 1);
+  const end = Math.min(totalPages, page + 1);
+  for (let p = start; p <= end; p++) pages.push(p);
+
+  const startIndex = (page - 1) * PAGE_SIZE + 1;
+  const endIndex = Math.min(page * PAGE_SIZE, total);
+
+  return (
+    <div className="flex items-center justify-between mt-3 text-sm text-slate-500">
+      <span>
+        Showing{" "}
+        <span className="font-semibold text-slate-700">{startIndex}</span>–
+        <span className="font-semibold text-slate-700">{endIndex}</span> of{" "}
+        <span className="font-semibold text-slate-700">
+          {total.toLocaleString("en-IN")}
+        </span>{" "}
+        records
+      </span>
+
+      <div className="flex items-center gap-1">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => onChange(page - 1)}
+          disabled={page === 1}
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </Button>
+
+        {pages.map((p) => (
+          <Button
+            key={p}
+            variant={p === page ? "default" : "outline"}
+            size="icon"
+            onClick={() => onChange(p)}
+          >
+            {p}
+          </Button>
+        ))}
+
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => onChange(page + 1)}
+          disabled={page === totalPages}
+        >
+          <ChevronRight className="w-4 h-4" />
+        </Button>
+      </div>
+    </div>
+  );
 }
 
 export default function StockReport() {
@@ -31,6 +102,9 @@ export default function StockReport() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+
   // Convert YYYY-MM-DD → DD-MM-YYYY for backend
   const toBackendDate = (dateStr: string) => {
     if (!dateStr) return "";
@@ -38,55 +112,75 @@ export default function StockReport() {
     return `${d}-${m}-${y}`;
   };
 
- const fetchStock = async () => {
-  if (!fromDate || !toDate) return;
-  setLoading(true);
-  setError(null);
+  const fetchStock = async (pageToLoad = 1) => {
+    if (!fromDate || !toDate) return;
+    setLoading(true);
+    setError(null);
 
-  try {
-    const fromParam = toBackendDate(fromDate);
-    const toParam = toBackendDate(toDate);
+    try {
+      const fromParam = toBackendDate(fromDate);
+      const toParam = toBackendDate(toDate);
 
-    const res = await axios.get(
-      `${API_URL}/stock?fromDate=${fromParam}&toDate=${toParam}`
-    );
+      const res = await axios.get(
+        `${API_URL}/stock?fromDate=${fromParam}&toDate=${toParam}&page=${pageToLoad}&pageSize=${PAGE_SIZE}`
+      );
 
-    if (res.data?.success && Array.isArray(res.data.data)) {
-      const rows = res.data.data.map((r: any) => ({
-        itemCode: r.COL1?.trim() || "",
-        itemName: r.COL2?.trim() || "",
-        uom: r.COL3?.trim() || "",
-        openingQty: parseFloat(r.COL4) || 0,
-        closingQty: parseFloat(r.COL5) || 0,
-      }));
+      const apiData = res.data;
+      if (apiData?.success && Array.isArray(apiData.data)) {
+        const rows = apiData.data.map((r: any) => ({
+          itemCode: r.COL1?.trim() || "",
+          itemName: r.COL2?.trim() || "",
+          uom: r.COL3?.trim() || "",
+          openingQty: parseFloat(r.COL4) || 0,
+          closingQty: parseFloat(r.COL5) || 0,
+        }));
 
-      setData(rows);
-    } else {
+        setData(rows);
+        setTotal(apiData.total ?? rows.length);
+        setPage(apiData.page ?? pageToLoad);
+      } else {
+        setData([]);
+        setTotal(0);
+      }
+    } catch (err: any) {
+      console.error("Fetch error:", err);
+      setError(err?.response?.data?.message || "Failed to fetch data");
       setData([]);
+      setTotal(0);
+    } finally {
+      setLoading(false);
     }
-  } catch (err: any) {
-    console.error("Fetch error:", err);
-    setError(err?.response?.data?.message || "Failed to fetch data");
-    setData([]);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
+  // Optional: load once on mount with default date range
+  // useEffect(() => {
+  //   fetchStock(1);
+  // }, []);
 
   const columns: ColumnDef<StockRow>[] = [
+    {
+      header: "S.No",
+      // 🔹 Global S.No: page 1 → 1–50, page 2 → 51–100, ...
+      cell: ({ row }) => (page - 1) * PAGE_SIZE + row.index + 1,
+      enableSorting: false,
+      size: 60,
+    },
     {
       accessorKey: "itemCode",
       header: () => <div className="text-center font-semibold">Item Code</div>,
       cell: ({ row }) => (
-        <div className="text-center text-slate-700">{row.original.itemCode}</div>
+        <div className="text-center text-slate-700">
+          {row.original.itemCode}
+        </div>
       ),
     },
     {
       accessorKey: "itemName",
       header: () => <div className="text-center font-semibold">Item Name</div>,
       cell: ({ row }) => (
-        <div className="text-center text-slate-700">{row.original.itemName}</div>
+        <div className="text-center text-slate-700">
+          {row.original.itemName}
+        </div>
       ),
     },
     {
@@ -98,14 +192,18 @@ export default function StockReport() {
     },
     {
       accessorKey: "openingQty",
-      header: () => <div className="text-center font-semibold">Opening Qty</div>,
+      header: () => (
+        <div className="text-center font-semibold">Opening Qty</div>
+      ),
       cell: ({ row }) => (
         <div className="text-center">{row.original.openingQty}</div>
       ),
     },
     {
       accessorKey: "closingQty",
-      header: () => <div className="text-center font-semibold">Closing Qty</div>,
+      header: () => (
+        <div className="text-center font-semibold">Closing Qty</div>
+      ),
       cell: ({ row }) =>
         row.original.closingQty === 0 ? (
           <div className="flex justify-center">
@@ -117,10 +215,14 @@ export default function StockReport() {
     },
   ];
 
+
   return (
     <div className="space-y-4">
       {/* Heading */}
-      <Heading heading="Stock Report" subtext="View Oracle stock data by date range">
+      <Heading
+        heading="Stock Report"
+        subtext="View Oracle stock data by date range"
+      >
         <Store size={50} className="text-primary" />
       </Heading>
 
@@ -148,7 +250,11 @@ export default function StockReport() {
         </div>
 
         <div className="flex gap-2 items-center justify-between sm:justify-start">
-          <Button onClick={fetchStock} disabled={loading} className="mt-2 sm:mt-0">
+          <Button
+            onClick={() => fetchStock(1)}
+            disabled={loading}
+            className="mt-2 sm:mt-0"
+          >
             {loading ? "Loading..." : "Search"}
           </Button>
           <Button
@@ -158,7 +264,7 @@ export default function StockReport() {
             onClick={() => {
               setFromDate(firstOfMonth);
               setToDate(todayStr);
-              fetchStock();
+              fetchStock(1);
             }}
           >
             <RefreshCw className="w-4 h-4" />
@@ -169,8 +275,11 @@ export default function StockReport() {
       {/* Record Count */}
       <div className="flex justify-between items-center text-sm text-slate-500">
         <p>
-          Showing <span className="font-semibold text-slate-700">{data.length}</span>{" "}
-          records
+          Showing{" "}
+          <span className="font-semibold text-slate-700">
+            {total.toLocaleString("en-IN")}
+          </span>{" "}
+          total records
         </p>
         {error && (
           <p className="text-red-600 text-sm bg-red-50 px-3 py-1 rounded-md">
@@ -189,6 +298,13 @@ export default function StockReport() {
           className="h-[70dvh] min-w-full text-center"
         />
       </div>
+
+      {/* Pagination Bar */}
+      <PaginationBar
+        page={page}
+        total={total}
+        onChange={(p) => fetchStock(p)}
+      />
 
       {/* Footer */}
       <div className="text-[11px] text-slate-400 text-right">

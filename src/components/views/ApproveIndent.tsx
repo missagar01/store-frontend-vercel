@@ -3,7 +3,7 @@ import DataTable from '../element/DataTable';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { toast } from 'sonner';
-import { ClipboardCheck } from 'lucide-react';
+import { ClipboardCheck, ChevronLeft, ChevronRight } from 'lucide-react';
 import Heading from '../element/Heading';
 import { Pill } from '../ui/pill';
 import {
@@ -30,10 +30,10 @@ import {
 import { Input } from '../ui/input';
 import { PuffLoader as Loader } from 'react-spinners';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
-import { API_URL } from '@/api'; // http://localhost:3004
+import { API_URL } from '@/api';
 
-// 👇 if your approve API is on 3002 keep separate base here
 const APPROVE_API_BASE = `${API_URL}/three-party-approval`;
+const PAGE_SIZE = 50;
 
 interface IndentRow {
   PLANNEDTIMESTAMP?: string | null;
@@ -55,13 +55,118 @@ interface IndentRow {
   VENDOR_TYPE?: string;
 }
 
+interface PaginationBarProps {
+  currentPage: number;
+  totalItems: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
+  isLoading?: boolean;
+}
+
+// 🔹 Pagination bar – max 3 buttons (1,2,3 style)
+function PaginationBar({
+  currentPage,
+  totalItems,
+  pageSize,
+  onPageChange,
+  isLoading,
+}: PaginationBarProps) {
+  if (totalItems === 0) return null;
+
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+
+  const startIndex = (currentPage - 1) * pageSize + 1;
+  const endIndex = Math.min(currentPage * pageSize, totalItems);
+
+  const pages: number[] = [];
+
+  if (totalPages <= 3) {
+    // 1–3 pages: show all
+    for (let i = 1; i <= totalPages; i++) pages.push(i);
+  } else {
+    // >3 pages: sliding window of 3
+    if (currentPage <= 2) {
+      pages.push(1, 2, 3);
+    } else if (currentPage >= totalPages - 1) {
+      pages.push(totalPages - 2, totalPages - 1, totalPages);
+    } else {
+      pages.push(currentPage - 1, currentPage, currentPage + 1);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mt-3 text-sm text-muted-foreground">
+      <span>
+        Showing{' '}
+        <span className="font-semibold">
+          {startIndex.toLocaleString('en-IN')}
+        </span>
+        –
+        <span className="font-semibold">
+          {endIndex.toLocaleString('en-IN')}
+        </span>{' '}
+        of{' '}
+        <span className="font-semibold">
+          {totalItems.toLocaleString('en-IN')}
+        </span>
+      </span>
+
+      <div className="flex items-center gap-1">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => onPageChange(currentPage - 1)}
+          disabled={currentPage === 1 || isLoading}
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </Button>
+
+        {pages.map((p) => (
+          <Button
+            key={p}
+            variant={p === currentPage ? 'default' : 'outline'}
+            size="icon"
+            onClick={() => onPageChange(p)}
+            disabled={isLoading || p === currentPage}
+          >
+            {p}
+          </Button>
+        ))}
+
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => onPageChange(currentPage + 1)}
+          disabled={currentPage === totalPages || isLoading}
+        >
+          <ChevronRight className="w-4 h-4" />
+        </Button>
+
+        {isLoading && (
+          <span className="ml-2 flex items-center gap-1 text-xs">
+            <Loader size={14} />
+            Loading...
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function ApproveIndent() {
   const { user } = useAuth();
   const [pendingData, setPendingData] = useState<IndentRow[]>([]);
   const [historyData, setHistoryData] = useState<IndentRow[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false); // initial + approve
+  const [pendingPageLoading, setPendingPageLoading] = useState(false);
+  const [historyPageLoading, setHistoryPageLoading] = useState(false);
   const [selectedIndent, setSelectedIndent] = useState<IndentRow | null>(null);
   const [openDialog, setOpenDialog] = useState(false);
+
+  const [pendingPage, setPendingPage] = useState(1);
+  const [pendingTotal, setPendingTotal] = useState(0);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyTotal, setHistoryTotal] = useState(0);
 
   // ✅ helper to fetch with token
   async function fetchWithToken(
@@ -83,46 +188,73 @@ export default function ApproveIndent() {
     return res;
   }
 
-  // Fetch data
-  async function fetchData() {
+  // common mapper
+  const mapData = (data: any[]): IndentRow[] =>
+    data.map((item: any) => ({
+      PLANNEDTIMESTAMP: item.PLANNEDTIMESTAMP || null,
+      INDENT_NUMBER: item.INDENT_NUMBER,
+      INDENT_DATE: item.INDENT_DATE,
+      INDENTER_NAME: item.INDENTER_NAME,
+      DIVISION: item.DIVISION,
+      DEPARTMENT: item.DEPARTMENT,
+      ITEM_NAME: item.ITEM_NAME,
+      UM: item.UM,
+      REQUIRED_QTY: item.REQUIRED_QTY,
+      REMARK: item.REMARK,
+      SPECIFICATION: item.SPECIFICATION,
+      COST_PROJECT: item.COST_PROJECT,
+      CANCELLEDDATE: item.CANCELLEDDATE || null,
+      CANCELLED_REMARK: item.CANCELLED_REMARK || null,
+      PO_NO: item.PO_NO || null,
+      PO_QTY: item.PO_QTY || null,
+      VENDOR_TYPE: item.VENDOR_TYPE || null,
+    }));
+
+  // 🔹 Pending page fetch
+  async function fetchPending(page = 1) {
+    try {
+      setPendingPageLoading(true);
+      const res = await fetchWithToken(
+        API_URL,
+        `/store-indent/pending?page=${page}&pageSize=${PAGE_SIZE}`
+      );
+      if (!res.ok) throw new Error('Failed to fetch pending indents');
+      const json = await res.json();
+      const rows = Array.isArray(json.data) ? json.data : [];
+
+      setPendingData(mapData(rows));
+      setPendingPage(json.page ?? page);
+      setPendingTotal(json.total ?? rows.length);
+    } finally {
+      setPendingPageLoading(false);
+    }
+  }
+
+  // 🔹 History page fetch
+  async function fetchHistory(page = 1) {
+    try {
+      setHistoryPageLoading(true);
+      const res = await fetchWithToken(
+        API_URL,
+        `/store-indent/history?page=${page}&pageSize=${PAGE_SIZE}`
+      );
+      if (!res.ok) throw new Error('Failed to fetch history');
+      const json = await res.json();
+      const rows = Array.isArray(json.data) ? json.data : [];
+
+      setHistoryData(mapData(rows));
+      setHistoryPage(json.page ?? page);
+      setHistoryTotal(json.total ?? rows.length);
+    } finally {
+      setHistoryPageLoading(false);
+    }
+  }
+
+  // Initial load: page 1 of each
+  async function fetchInitial() {
     try {
       setLoading(true);
-      // ✅ both GETs now send token
-      const [pendingRes, historyRes] = await Promise.all([
-        fetchWithToken(API_URL, '/store-indent/pending'),
-        fetchWithToken(API_URL, '/store-indent/history'),
-      ]);
-
-      if (!pendingRes.ok || !historyRes.ok) {
-        throw new Error('Failed to fetch indents');
-      }
-
-      const pending = await pendingRes.json();
-      const history = await historyRes.json();
-
-      const mapData = (data: any[]): IndentRow[] =>
-        data.map((item: any) => ({
-          PLANNEDTIMESTAMP: item.PLANNEDTIMESTAMP || null,
-          INDENT_NUMBER: item.INDENT_NUMBER,
-          INDENT_DATE: item.INDENT_DATE,
-          INDENTER_NAME: item.INDENTER_NAME,
-          DIVISION: item.DIVISION,
-          DEPARTMENT: item.DEPARTMENT,
-          ITEM_NAME: item.ITEM_NAME,
-          UM: item.UM,
-          REQUIRED_QTY: item.REQUIRED_QTY,
-          REMARK: item.REMARK,
-          SPECIFICATION: item.SPECIFICATION,
-          COST_PROJECT: item.COST_PROJECT,
-          CANCELLEDDATE: item.CANCELLEDDATE || null,
-          CANCELLED_REMARK: item.CANCELLED_REMARK || null,
-          PO_NO: item.PO_NO || null,
-          PO_QTY: item.PO_QTY || null,
-          VENDOR_TYPE: item.VENDOR_TYPE || null,
-        }));
-
-      setPendingData(mapData(pending));
-      setHistoryData(mapData(history));
+      await Promise.all([fetchPending(1), fetchHistory(1)]);
     } catch (err) {
       toast.error('Failed to fetch indents');
       console.error(err);
@@ -132,7 +264,7 @@ export default function ApproveIndent() {
   }
 
   useEffect(() => {
-    fetchData();
+    fetchInitial();
   }, []);
 
   const formatDate = (dateString?: string | null) =>
@@ -156,8 +288,12 @@ export default function ApproveIndent() {
         })
       : '';
 
+  // 🔹 Pending columns (GLOBAL S.No)
   const pendingColumns: ColumnDef<IndentRow>[] = [
-    { header: 'S.No', cell: ({ row }) => row.index + 1 },
+    {
+      header: 'S.No',
+      cell: ({ row }) => (pendingPage - 1) * PAGE_SIZE + row.index + 1,
+    },
     {
       accessorKey: 'PLANNEDTIMESTAMP',
       header: ' Planned Time Stamp',
@@ -186,8 +322,12 @@ export default function ApproveIndent() {
     },
   ];
 
+  // 🔹 History columns (GLOBAL S.No)
   const historyColumns: ColumnDef<IndentRow>[] = [
-    { header: 'S.No', cell: ({ row }) => row.index + 1 },
+    {
+      header: 'S.No',
+      cell: ({ row }) => (historyPage - 1) * PAGE_SIZE + row.index + 1,
+    },
     {
       accessorKey: 'PLANNEDTIMESTAMP',
       header: ' Planned Time Stamp ',
@@ -262,9 +402,8 @@ export default function ApproveIndent() {
     if (selectedIndent) {
       form.setValue('approvedQuantity', selectedIndent.REQUIRED_QTY);
     }
-  }, [selectedIndent]);
+  }, [selectedIndent, form]);
 
-  // ✅ approval call now also sends token
   async function onSubmit(values: z.infer<typeof schema>) {
     try {
       const token = localStorage.getItem('token');
@@ -290,7 +429,7 @@ export default function ApproveIndent() {
       );
       setOpenDialog(false);
       form.reset();
-      await fetchData();
+      await fetchInitial();
     } catch (err) {
       toast.error('Failed to update indent');
       console.error(err);
@@ -330,7 +469,21 @@ export default function ApproveIndent() {
                   'DEPARTMENT',
                   'INDENTER_NAME',
                 ]}
-                dataLoading={loading}
+                dataLoading={loading || pendingPageLoading}
+              />
+              <PaginationBar
+                currentPage={pendingPage}
+                totalItems={pendingTotal}
+                pageSize={PAGE_SIZE}
+                isLoading={pendingPageLoading}
+                onPageChange={(page) => {
+                  if (page === pendingPage) return; // same page → no fetch
+                  const safe = Math.max(1, page);
+                  fetchPending(safe).catch((err) => {
+                    console.error(err);
+                    toast.error('Failed to change page');
+                  });
+                }}
               />
             </div>
           </TabsContent>
@@ -346,7 +499,21 @@ export default function ApproveIndent() {
                   'DEPARTMENT',
                   'INDENTER_NAME',
                 ]}
-                dataLoading={loading}
+                dataLoading={loading || historyPageLoading}
+              />
+              <PaginationBar
+                currentPage={historyPage}
+                totalItems={historyTotal}
+                pageSize={PAGE_SIZE}
+                isLoading={historyPageLoading}
+                onPageChange={(page) => {
+                  if (page === historyPage) return;
+                  const safe = Math.max(1, page);
+                  fetchHistory(safe).catch((err) => {
+                    console.error(err);
+                    toast.error('Failed to change page');
+                  });
+                }}
               />
             </div>
           </TabsContent>
