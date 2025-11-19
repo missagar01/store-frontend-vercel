@@ -4,7 +4,6 @@ import {
   type ColumnDef,
   flexRender,
   getCoreRowModel,
-  getFilteredRowModel,
   useReactTable,
 } from "@tanstack/react-table";
 
@@ -16,7 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Input } from "../ui/input";
 import { Package } from "lucide-react";
 import { Skeleton } from "../ui/skeleton";
@@ -31,16 +30,16 @@ interface DataTableProps<TData, TValue> {
   className?: string;
 }
 
-function globalFilterFn<TData>(
+function matchesSearch<TData>(
   row: TData,
   columnIds: string[],
   filterValue: string
 ) {
+  if (!columnIds.length || !filterValue) return true;
+  const needle = filterValue.toLowerCase();
   return columnIds.some((columnId) => {
     const value = (row as any)[columnId];
-    return String(value ?? "")
-      .toLowerCase()
-      .includes(filterValue.toLowerCase());
+    return String(value ?? "").toLowerCase().includes(needle);
   });
 }
 
@@ -52,19 +51,30 @@ export default function DataTable<TData, TValue>({
   children,
   className,
 }: DataTableProps<TData, TValue>) {
-  const [globalFilter, setGlobalFilter] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const searchableFields = useMemo(() => {
+    if (searchFields.length) return searchFields;
+    return columns
+      .map((column) =>
+        typeof column.accessorKey === "string" ? column.accessorKey : undefined
+      )
+      .filter(Boolean) as string[];
+  }, [columns, searchFields]);
+
+  const normalizedSearch = searchTerm.trim().toLowerCase();
+  const filteredData = useMemo(() => {
+    if (!normalizedSearch) return data;
+    if (!searchableFields.length) return data;
+    return data.filter((row) =>
+      matchesSearch(row, searchableFields, normalizedSearch)
+    );
+  }, [data, searchableFields, normalizedSearch]);
+
   const table = useReactTable({
-    data,
+    data: filteredData,
     columns,
     getCoreRowModel: getCoreRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    globalFilterFn: (row, _, filterValue) =>
-      globalFilterFn(row.original, searchFields, filterValue),
-
-    state: {
-      globalFilter,
-    },
-    onGlobalFilterChange: setGlobalFilter,
   });
 
   return (
@@ -75,8 +85,8 @@ export default function DataTable<TData, TValue>({
           <div className="flex items-center w-full">
             <Input
               placeholder={`Search...`}
-              value={globalFilter}
-              onChange={(e) => setGlobalFilter(e.target.value)}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full"
             />
           </div>

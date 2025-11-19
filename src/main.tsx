@@ -1,6 +1,5 @@
 // src/main.tsx
 import "@/index.css";
-
 import React, { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { AuthProvider, useAuth } from "@/context/AuthContext.tsx";
@@ -38,7 +37,7 @@ import ApprowIndentData from "./components/views/ApprowIndentData";
 const adminRoutes: RouteAttributes[] = [
   { path: "", name: "Dashboard", icon: <LayoutDashboard size={20} />, element: <Dashboard />, notifications: () => 0 },
   { path: "inventory", name: "Inventory", icon: <Store size={20} />, element: <Inventory />, notifications: () => 0 },
-  { path: "create-indent", name: "Create Indent", icon: <ClipboardList size={20} />, element: <CreateIndent />, notifications: () => 0 },
+  // { path: "create-indent", name: "Create Indent", icon: <ClipboardList size={20} />, element: <CreateIndent />, notifications: () => 0 },
   {
     path: "indent",
     name: "Indent",

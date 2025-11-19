@@ -16,13 +16,10 @@ import { useLocation } from 'react-router-dom';
 import axiosInstance from '@/utils/axiosConfig';
 import { API_URL, decodeToken } from '@/api';
 import { toast } from 'sonner';
-import { postToSheet, fetchSheet } from '@/lib/fetchers';
-
 type IndentForm = {
   formType: 'INDENT' | 'REQUISITION' | '';  // 👈 new
   indentSeries: string;
   department: string;
-  requestNumber: string;
   requesterName: string;
   division: string;
   items: {
@@ -47,40 +44,6 @@ type UomRow = {
   item_name: string;
   uom: string;
 };
-
-// Generate sequential request number based on form type
-// INDENT => INT01, REQUISITION => REQ01 (2+ digits padded)
-async function generateRequestNumber(formType: 'INDENT' | 'REQUISITION' | '') {
-  const prefix = formType === 'INDENT' ? 'IND' : 'REQ';
-  // Fallback if not selected
-  if (!formType) return `${prefix}01`;
-
-  try {
-    const raw = await fetchSheet('INDENT');
-    const rows = Array.isArray(raw) ? (raw as Array<Record<string, unknown>>) : [];
-    // rows is array of existing sheet rows; extract requestNumber matching our prefix
-    const numbers: number[] = rows
-          .map((r) => {
-            const rn = (r as Record<string, unknown>).requestNumber ?? (r as Record<string, unknown>).REQUESTNUMBER;
-            return typeof rn === 'string' ? rn : '';
-          })
-          .filter((val: string) => val.startsWith(prefix))
-          .map((val: string) => {
-            const numPart = val.replace(prefix, '').replace(/[^0-9]/g, '');
-            const n = parseInt(numPart, 10);
-            return isNaN(n) ? 0 : n;
-          })
-
-    const last = numbers.length ? Math.max(...numbers) : 0;
-    const next = last + 1;
-    // Pad to at least 2 digits
-    const padded = String(next).padStart(2, '0');
-    return `${prefix}${padded}`;
-  } catch {
-    // On any error, fallback to 01 for that prefix
-    return `${prefix}01`;
-  }
-}
 
 export default function UserIndent() {
   const location = useLocation();
@@ -304,7 +267,38 @@ export default function UserIndent() {
     setValue(`items.${rowIndex}.itemCode`, found?.item_code || '');
   };
 
-  // 6) Submit to Google Sheet
+  const generateRequestNumber = async (
+    currentFormType: 'INDENT' | 'REQUISITION'
+  ) => {
+    const prefix = currentFormType === 'INDENT' ? 'IND' : 'REQ';
+    try {
+      const res = await axiosInstance.get('/indent/all');
+      const list = Array.isArray(res.data?.data)
+        ? res.data.data
+        : Array.isArray(res.data)
+          ? res.data
+          : [];
+
+      const nextNumber =
+        list
+          .map((row: any) => {
+            const value = row.request_number ?? row.requestNumber ?? '';
+            if (typeof value !== 'string') return 0;
+            if (!value.toUpperCase().startsWith(prefix)) return 0;
+            const numeric = value.replace(/[^0-9]/g, '');
+            const parsed = parseInt(numeric, 10);
+            return Number.isNaN(parsed) ? 0 : parsed;
+          })
+          .reduce((max, current) => (current > max ? current : max), 0) + 1;
+
+      return `${prefix}${String(nextNumber).padStart(2, '0')}`;
+    } catch (error) {
+      console.error('Failed to generate request number:', error);
+      return `${prefix}${String(Date.now() % 100).padStart(2, '0')}`;
+    }
+  };
+
+  // 6) Submit to backend API
   const onSubmit = async (data: IndentForm) => {
     try {
       if (!data.items || data.items.length === 0) {
@@ -317,44 +311,55 @@ export default function UserIndent() {
         return;
       }
 
+      if (!data.formType) {
+        toast.error('Please select a form type');
+        return;
+      }
+
+      if (!data.indentSeries) {
+        toast.error('Please select an indent/requisition series');
+        return;
+      }
+
       const requestNumber = await generateRequestNumber(data.formType);
 
-      const rows = data.items
+      const payloads = data.items
         .filter((item) => item.productName && item.itemCode)
         .map((item) => {
+          const qty = item.requestQty ? Number(item.requestQty) : 0;
           const specificationValue = item.specification
             ? String(item.specification).trim()
             : '';
 
           return {
-            timestamp: new Date().toISOString(),
-            formType: data.formType || '',          // 👈 send form type
-            requestNumber: requestNumber,
-            indentSeries: data.indentSeries || '',
-            requesterName: data.requesterName || '',
+            form_type: data.formType,
+            indent_series: data.indentSeries,
+            requester_name: data.requesterName || '',
             department: data.department || '',
             division: data.division || '',
-            itemCode: item.itemCode || '',
-            productName: item.productName || '',
-            requestQty: item.requestQty ? Number(item.requestQty) : 0,
+            item_code: item.itemCode || '',
+            product_name: item.productName || '',
+            request_qty: qty,
             uom: item.uom || '',
-            specifications: specificationValue,
-            Specification: specificationValue,
             specification: specificationValue,
             make: item.make || '',
             purpose: item.purpose || '',
-            costLocation: item.costLocation || '',
+            cost_location: item.costLocation || '',
+            request_state: 'PENDING',
+            request_number: requestNumber,
           };
         });
 
-      if (rows.length === 0) {
+      if (payloads.length === 0) {
         toast.error('Please add at least one valid item');
         return;
       }
 
-      await postToSheet(rows, 'insert', 'INDENT');
+      await Promise.all(
+        payloads.map((payload) => axiosInstance.post('/indent', payload))
+      );
 
-      toast.success(`Indent ${requestNumber} saved to Google Sheet successfully!`);
+      toast.success(`${requestNumber} submitted successfully!`);
 
       reset((prev) => ({
         ...prev,
@@ -375,8 +380,10 @@ export default function UserIndent() {
         ],
       }));
     } catch (err: any) {
-      console.error('Error saving to Google Sheet:', err);
-      toast.error('Failed to save indent to Google Sheet');
+      console.error('Error submitting indent:', err);
+      const message =
+        err?.response?.data?.message || 'Failed to save indent to backend';
+      toast.error(message);
     }
   };
 

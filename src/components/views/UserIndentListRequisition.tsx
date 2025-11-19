@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import Heading from '../element/Heading';
-import { fetchSheet } from '@/lib/fetchers';
 import DataTable from '../element/DataTable';
 import type { ColumnDef } from '@tanstack/react-table';
 import { Button } from '../ui/button';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import axiosInstance from '@/utils/axiosConfig';
+import { toast } from 'sonner';
 
 type IndentRow = {
   timestamp: string;
@@ -32,30 +33,53 @@ export default function UserIndentListRequisition() {
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
-    fetchSheet('INDENT')
-      .then((res) => {
+
+    const fetchRequisitions = async () => {
+      setLoading(true);
+      try {
+        const res = await axiosInstance.get('/indent/all');
         if (!active) return;
-        const list = Array.isArray(res) ? (res as any[]) : [];
-        const mapped = list.map((r) => ({
-          timestamp: r.timestamp ?? r.TIMESTAMP ?? '',
-          formType: r.formType ?? r.FORMTYPE ?? '',
-          requestNumber: r.requestNumber ?? r.REQUESTNUMBER ?? '',
-          indentSeries: r.indentSeries ?? r.INDENTSERIES ?? '',
-          requesterName: r.requesterName ?? r.REQUESTERNAME ?? '',
-          department: r.department ?? r.DEPARTMENT ?? '',
-          division: r.division ?? r.DIVISION ?? '',
-          itemCode: r.itemCode ?? r.ITEMCODE ?? '',
-          productName: r.productName ?? r.PRODUCTNAME ?? '',
-          requestQty: Number(r.requestQty ?? r.REQUESTQTY ?? 0) || 0,
-          uom: r.uom ?? r.UOM ?? '',
-          make: r.make ?? r.MAKE ?? '',
-          purpose: r.purpose ?? r.PURPOSE ?? '',
-          costLocation: r.costLocation ?? r.COSTLOCATION ?? '',
-        }));
-        setRows(mapped.filter((r) => (r.formType || '').toUpperCase() === 'REQUISITION'));
-      })
-      .finally(() => active && setLoading(false));
+
+        const list = Array.isArray(res.data?.data)
+          ? res.data.data
+          : Array.isArray(res.data)
+            ? res.data
+            : [];
+
+        const mapped = list
+          .map((r: any) => ({
+            timestamp: r.sample_timestamp ?? r.timestamp ?? r.created_at ?? '',
+            formType: r.form_type ?? r.formType ?? '',
+            requestNumber: r.request_number ?? r.requestNumber ?? '',
+            indentSeries: r.indent_series ?? r.indentSeries ?? '',
+            requesterName: r.requester_name ?? r.requesterName ?? '',
+            department: r.department ?? '',
+            division: r.division ?? '',
+            itemCode: r.item_code ?? r.itemCode ?? '',
+            productName: r.product_name ?? r.productName ?? '',
+            requestQty: Number(r.request_qty ?? r.requestQty ?? 0) || 0,
+            uom: r.uom ?? '',
+            make: r.make ?? '',
+            purpose: r.purpose ?? '',
+            costLocation: r.cost_location ?? r.costLocation ?? '',
+          }))
+          .filter((r) => (r.formType || '').toUpperCase() === 'REQUISITION');
+
+        setRows(mapped);
+      } catch (err) {
+        console.error('Failed to load requisition data', err);
+        if (active) {
+          toast.error('Failed to load requisition list');
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchRequisitions();
+
     return () => {
       active = false;
     };

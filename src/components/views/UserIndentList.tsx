@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import Heading from '../element/Heading';
-import { fetchSheet } from '@/lib/fetchers';
 import DataTable from '../element/DataTable';
 import type { ColumnDef } from '@tanstack/react-table';
 import { Button } from '../ui/button';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import axiosInstance from '@/utils/axiosConfig';
+import { toast } from 'sonner';
 
 type IndentRow = {
   timestamp: string;
@@ -32,31 +33,51 @@ export default function UserIndentList() {
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
-    fetchSheet('INDENT')
-      .then((res) => {
+
+    const fetchIndents = async () => {
+      setLoading(true);
+      try {
+        const res = await axiosInstance.get('/indent/all');
         if (!active) return;
-        const list = Array.isArray(res) ? (res as any[]) : [];
+
+        const payload = Array.isArray(res.data?.data)
+          ? res.data.data
+          : Array.isArray(res.data)
+            ? res.data
+            : [];
+
         setRows(
-          list.map((r) => ({
-            timestamp: r.timestamp ?? r.TIMESTAMP ?? '',
-            formType: r.formType ?? r.FORMTYPE ?? '',
-            requestNumber: r.requestNumber ?? r.REQUESTNUMBER ?? '',
-            indentSeries: r.indentSeries ?? r.INDENTSERIES ?? '',
-            requesterName: r.requesterName ?? r.REQUESTERNAME ?? '',
-            department: r.department ?? r.DEPARTMENT ?? '',
-            division: r.division ?? r.DIVISION ?? '',
-            itemCode: r.itemCode ?? r.ITEMCODE ?? '',
-            productName: r.productName ?? r.PRODUCTNAME ?? '',
-            requestQty: Number(r.requestQty ?? r.REQUESTQTY ?? 0) || 0,
-            uom: r.uom ?? r.UOM ?? '',
-            make: r.make ?? r.MAKE ?? '',
-            purpose: r.purpose ?? r.PURPOSE ?? '',
-            costLocation: r.costLocation ?? r.COSTLOCATION ?? '',
+          payload.map((r: any) => ({
+            timestamp: r.timestamp ?? r.created_at ?? r.createdAt ?? '',
+            formType: r.form_type ?? r.formType ?? '',
+            requestNumber: r.request_number ?? r.requestNumber ?? '',
+            indentSeries: r.indent_series ?? r.indentSeries ?? '',
+            requesterName: r.requester_name ?? r.requesterName ?? '',
+            department: r.department ?? '',
+            division: r.division ?? '',
+            itemCode: r.item_code ?? r.itemCode ?? '',
+            productName: r.product_name ?? r.productName ?? '',
+            requestQty: Number(r.request_qty ?? r.requestQty ?? 0) || 0,
+            uom: r.uom ?? '',
+            make: r.make ?? '',
+            purpose: r.purpose ?? '',
+            costLocation: r.cost_location ?? r.costLocation ?? '',
           }))
         );
-      })
-      .finally(() => active && setLoading(false));
+      } catch (err) {
+        console.error('Failed to load indent list', err);
+        if (active) {
+          toast.error('Failed to load indent list');
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchIndents();
+
     return () => {
       active = false;
     };

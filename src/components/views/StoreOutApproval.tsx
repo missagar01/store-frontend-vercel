@@ -1,11 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Heading from '../element/Heading';
 import { ClipboardCheck } from 'lucide-react';
-import { fetchSheet } from '@/lib/fetchers';
 import DataTable from '../element/DataTable';
 import type { ColumnDef } from '@tanstack/react-table';
 import { Input } from '../ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import {
   Dialog,
   DialogContent,
@@ -14,8 +12,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../ui/dialog';
+import axiosInstance from '@/utils/axiosConfig';
+import { toast } from 'sonner';
 
 type IndentRow = {
+  id?: string;
   timestamp: string;
   requestNumber?: string;
   requesterName?: string;
@@ -28,51 +29,37 @@ type IndentRow = {
   uom?: string;
   costLocation?: string;
   formType?: string;
-  status?: 'APPROVED' | 'REJECTED' | '';
-  rowIndex?: number;
-  sheetName?: string;
+  status?: 'APPROVED' | 'REJECTED' | 'PENDING' | '';
 };
 
-const GAS_URL = import.meta.env.VITE_APP_SCRIPT_URL as string;
+const mapApiRowToIndent = (rec: Record<string, any>): IndentRow => {
+  const normalizeStatus = (val: unknown) => {
+    if (typeof val !== 'string') return '';
+    return val.toUpperCase();
+  };
 
-// ✅ Send only status + approved qty + actual1
-async function sendApprovedToSheet(items: IndentRow[], sheetName = 'INDENT') {
-  const nowIso = new Date().toISOString();
-
-  const rowsForGas = items.map((m) => ({
-    rowIndex: m.rowIndex,
-    requestNumber: '',
-    indentSeries: '',
-    requesterName: '',
-    department: '',
-    division: '',
-    itemCode: '',
-    productName: '',
-    requestQty: '',
-    uom: '',
-    costLocation: '',
-    formType: '',
-    actual1: nowIso,
-    requestStatus: m.status && m.status !== '' ? m.status : 'PENDING',
-    approvedQuantity:
-      typeof m.requestQty === 'number' ? m.requestQty : Number(m.requestQty || 0),
-  }));
-
-  const body = new URLSearchParams({
-    action: 'update',
-    sheetName,
-    rows: JSON.stringify(rowsForGas),
-  });
-
-  const res = await fetch(GAS_URL, {
-    method: 'POST',
-    body,
-  });
-
-  const txt = await res.text();
-  console.log('[GAS response]', txt);
-  if (!res.ok) throw new Error(txt || 'Sheet update failed');
-}
+  return {
+    id: rec['id'] ? String(rec['id']) : undefined,
+    timestamp:
+      rec['sample_timestamp'] ??
+      rec['timestamp'] ??
+      rec['created_at'] ??
+      rec['createdAt'] ??
+      '',
+    requestNumber: rec['request_number'] ?? rec['requestNumber'] ?? '',
+    requesterName: rec['requester_name'] ?? rec['requesterName'] ?? '',
+    department: rec['department'] ?? '',
+    indentSeries: rec['indent_series'] ?? rec['indentSeries'] ?? '',
+    division: rec['division'] ?? '',
+    itemCode: rec['item_code'] ?? rec['itemCode'] ?? '',
+    productName: rec['product_name'] ?? rec['productName'] ?? '',
+    requestQty: Number(rec['request_qty'] ?? rec['requestQty'] ?? 0) || 0,
+    uom: rec['uom'] ?? '',
+    costLocation: rec['cost_location'] ?? rec['costLocation'] ?? '',
+    formType: rec['form_type'] ?? rec['formType'] ?? '',
+    status: normalizeStatus(rec['request_status']),
+  };
+};
 
 export default function StoreOutApproval() {
   const [rows, setRows] = useState<IndentRow[]>([]);
@@ -82,50 +69,40 @@ export default function StoreOutApproval() {
   const [openEdit, setOpenEdit] = useState(false);
   const [modalItems, setModalItems] = useState<IndentRow[]>([]);
   const [saving, setSaving] = useState(false);
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const canSave = useMemo(
+    () =>
+      modalItems.length > 0 &&
+      modalItems.every(
+        (item) =>
+          item.status &&
+          item.status !== '' &&
+          item.status.toUpperCase() !== 'PENDING'
+      ),
+    [modalItems]
+  );
 
-  // ✅ Fetch sheet data
   useEffect(() => {
     let active = true;
     setLoading(true);
 
-    fetchSheet('INDENT')
-      .then((res) => {
+    const fetchIndents = async () => {
+      try {
+        const res = await axiosInstance.get('/indent/all');
         if (!active) return;
 
-        const list = Array.isArray(res)
-          ? res
-          : Array.isArray((res as any).rows)
-          ? (res as any).rows
-          : [];
+        const payload = Array.isArray(res.data?.data)
+          ? res.data.data
+          : Array.isArray(res.data)
+            ? res.data
+            : [];
 
-        const s = (v: unknown) => (typeof v === 'string' ? v : '');
-        const n = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : 0);
-        const DATA_STARTS_AT = 7;
-
-        const mapped: IndentRow[] = (list as Array<Record<string, any>>).map((rec, idx) => ({
-          timestamp: s(rec['timestamp'] ?? rec['Timestamp']),
-          requestNumber: s(rec['requestNumber'] ?? rec['Request Number']),
-          requesterName: s(rec['requesterName'] ?? rec['Requester Name']),
-          department: s(rec['department'] ?? rec['Department']),
-          indentSeries: s(rec['indentSeries'] ?? rec['Indent Series']),
-          division: s(rec['division'] ?? rec['Division']),
-          itemCode: s(rec['itemCode'] ?? rec['Item Code']),
-          productName: s(rec['productName'] ?? rec['Product Name']),
-          requestQty: n(rec['requestQty'] ?? rec['Request Qty']),
-          uom: s(rec['uom'] ?? rec['UOM']),
-          costLocation: s(rec['costLocation'] ?? rec['Cost Location']),
-          formType: s(rec['formType'] ?? rec['Form Type']),
-          status: s(rec['requestStatus'] ?? ''),
-          rowIndex:
-            typeof rec['rowIndex'] === 'number' && rec['rowIndex'] > 0
-              ? rec['rowIndex']
-              : DATA_STARTS_AT + idx,
-          sheetName: s(rec['sheetName'] ?? 'INDENT'),
-        }));
+        const mapped = payload.map((rec: Record<string, any>) =>
+          mapApiRowToIndent(rec)
+        );
 
         setRows(mapped);
 
-        // Auto-fill header
         if (mapped.length > 0) {
           const sorted = [...mapped].sort(
             (a, b) => Date.parse(b.timestamp || '') - Date.parse(a.timestamp || '')
@@ -134,15 +111,25 @@ export default function StoreOutApproval() {
           if (latest?.requestNumber) setIndentNumber(latest.requestNumber);
           if (latest?.requesterName) setHeaderRequesterName(latest.requesterName);
         }
-      })
-      .finally(() => active && setLoading(false));
+      } catch (err) {
+        console.error('Failed to load indents', err);
+        if (active) {
+          toast.error('Failed to load indent list');
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchIndents();
 
     return () => {
       active = false;
     };
   }, []);
 
-  // ✅ Only show rows where Form Type = "REQUISITION" and not APPROVED/REJECTED
   const requisitionRows = useMemo(
     () =>
       rows.filter(
@@ -154,33 +141,63 @@ export default function StoreOutApproval() {
     [rows]
   );
 
-  // ✅ Columns
+  const fetchRequestItems = useCallback(async (requestNo: string) => {
+    const res = await axiosInstance.get(`/indent/${requestNo}`);
+    const payload = res.data?.data;
+    const list = Array.isArray(payload)
+      ? payload
+      : payload
+        ? [payload]
+        : [];
+    return list.map((rec: Record<string, any>) => mapApiRowToIndent(rec));
+  }, []);
+
+  const handleProcess = useCallback(
+    async (row: IndentRow) => {
+      const rn = row.requestNumber || '';
+      if (!rn) {
+        toast.error('Request number unavailable for this row');
+        return;
+      }
+
+      setIndentNumber(rn);
+      setHeaderRequesterName(row.requesterName || '');
+      setModalItems([]);
+      setDetailsLoading(true);
+      setOpenEdit(true);
+
+      try {
+        const details = await fetchRequestItems(rn);
+        setModalItems(details);
+      } catch (err) {
+        console.error('Failed to fetch request details', err);
+        toast.error('Failed to fetch indent details');
+        setOpenEdit(false);
+      } finally {
+        setDetailsLoading(false);
+      }
+    },
+    [fetchRequestItems]
+  );
+
   const columns: ColumnDef<IndentRow>[] = useMemo(
     () => [
       {
         id: 'actions',
         header: 'Actions',
-        cell: ({ row }) => {
-          const r = row.original;
-          return (
-            <div className="flex gap-2 justify-center">
-              <button
-                className="px-2 py-1 rounded bg-primary text-white text-xs"
-                onClick={(e) => {
-                  e.preventDefault();
-                  const rn = r.requestNumber || '';
-                  const sameReqRows = rows.filter((x) => x.requestNumber === rn);
-                  setIndentNumber(rn);
-                  setHeaderRequesterName(r.requesterName || '');
-                  setModalItems(sameReqRows);
-                  setOpenEdit(true);
-                }}
-              >
-                Process
-              </button>
-            </div>
-          );
-        },
+        cell: ({ row }) => (
+          <div className="flex gap-2 justify-center">
+            <button
+              className="px-2 py-1 rounded bg-primary text-white text-xs"
+              onClick={(e) => {
+                e.preventDefault();
+                handleProcess(row.original);
+              }}
+            >
+              Process
+            </button>
+          </div>
+        ),
       },
       { accessorKey: 'requestNumber', header: 'Request No.' },
       { accessorKey: 'formType', header: 'Form Type' },
@@ -194,13 +211,36 @@ export default function StoreOutApproval() {
       { accessorKey: 'requestQty', header: 'Qty' },
       { accessorKey: 'costLocation', header: 'Cost Location' },
     ],
-    [rows]
+    [handleProcess]
   );
 
-  // ✅ Save updates
   async function onSaveEdit() {
+    if (!indentNumber) {
+      toast.error('Request number missing');
+      return;
+    }
+
+    if (!canSave) {
+      toast.error('Please approve or reject every item before saving');
+      return;
+    }
+
     try {
       setSaving(true);
+
+      const payload = modalItems.map((item) => ({
+        id: item.id,
+        request_number: indentNumber,
+        item_code: item.itemCode,
+        request_qty: Number(item.requestQty ?? 0),
+        approved_quantity: Number(item.requestQty ?? 0),
+        request_status:
+          item.status && item.status !== '' ? item.status : 'PENDING',
+      }));
+
+      await axiosInstance.put(`/indent/${indentNumber}/status`, {
+        items: payload,
+      });
 
       setRows((prev) => {
         const reqNo = indentNumber;
@@ -208,11 +248,11 @@ export default function StoreOutApproval() {
         return [...others, ...modalItems];
       });
 
-      await sendApprovedToSheet(modalItems, 'INDENT');
+      toast.success('Indent status updated');
       setOpenEdit(false);
     } catch (err) {
-      console.error('Failed to update sheet', err);
-      alert('Failed to update sheet');
+      console.error('Failed to update indent status', err);
+      toast.error('Failed to update indent status');
     } finally {
       setSaving(false);
     }
@@ -290,7 +330,13 @@ export default function StoreOutApproval() {
                 </tr>
               </thead>
               <tbody>
-                {modalItems.length === 0 ? (
+                {detailsLoading ? (
+                  <tr>
+                    <td colSpan={6} className="text-center py-4 text-muted-foreground">
+                      Loading items...
+                    </td>
+                  </tr>
+                ) : modalItems.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="text-center py-4 text-muted-foreground">
                       No items for this request.
@@ -373,7 +419,7 @@ export default function StoreOutApproval() {
                 e.preventDefault();
                 onSaveEdit();
               }}
-              disabled={saving}
+              disabled={saving || !canSave}
             >
               {saving ? 'Saving…' : 'Save Changes'}
             </button>

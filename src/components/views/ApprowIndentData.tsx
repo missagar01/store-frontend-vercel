@@ -1,11 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Heading from '../element/Heading';
 import { ClipboardCheck } from 'lucide-react';
-import { fetchSheet } from '@/lib/fetchers';
 import DataTable from '../element/DataTable';
 import type { ColumnDef } from '@tanstack/react-table';
 import { Input } from '../ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import {
   Dialog,
   DialogContent,
@@ -14,9 +12,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../ui/dialog';
+import axiosInstance from '@/utils/axiosConfig';
+import { toast } from 'sonner';
 
 // Row type
 type IndentRow = {
+  id?: string;
   timestamp: string;
   requestNumber?: string;
   requesterName?: string;
@@ -29,58 +30,38 @@ type IndentRow = {
   uom?: string;
   costLocation?: string;
   formType?: string;
-  status?: 'APPROVED' | 'REJECTED' | '';
-  rowIndex?: number;
-  sheetName?: string;
+  status?: 'APPROVED' | 'REJECTED' | 'PENDING' | '';
 };
 
-// GAS endpoint
-const GAS_URL = import.meta.env.VITE_APP_SCRIPT_URL as string;
+const mapApiRowToIndent = (rec: Record<string, any>): IndentRow => {
+  const normalizeStatus = (val: unknown) => {
+    if (typeof val !== 'string') return '';
+    const upper = val.toUpperCase();
+    return upper;
+  };
 
-// ✅ Send updates (Request Status + Approved Quantity + Actual 1 timestamp)
-async function sendApprovedToSheet(items: IndentRow[], sheetName = 'INDENT') {
-  const nowIso = new Date().toISOString();
-
-  const rowsForGas = items.map((m) => ({
-    rowIndex: m.rowIndex, // must match the sheet row
-    // keep others blank to avoid overwriting
-    requestNumber: '',
-    indentSeries: '',
-    requesterName: '',
-    department: '',
-    division: '',
-    itemCode: '',
-    productName: '',
-    requestQty: '',
-    uom: '',
-    costLocation: '',
-    formType: '',
-    // ✅ Actual 1 timestamp
-    actual1: nowIso,
-    // ✅ Status and approved quantity
-    requestStatus: m.status && m.status !== '' ? m.status : 'PENDING',
-    approvedQuantity:
-      typeof m.requestQty === 'number' ? m.requestQty : Number(m.requestQty || 0),
-  }));
-
-  // console.log('[frontend] sending rows to GAS:', rowsForGas);
-
-  const body = new URLSearchParams({
-    action: 'update',
-    sheetName,
-    rows: JSON.stringify(rowsForGas),
-  });
-
-  const res = await fetch(GAS_URL, {
-    method: 'POST',
-    body,
-  });
-
-  const text = await res.text();
-  // console.log('[frontend] GAS raw response:', text);
-
-  if (!res.ok) throw new Error(text || 'Sheet update failed');
-}
+  return {
+    id: rec['id'] ? String(rec['id']) : undefined,
+    timestamp:
+      rec['sample_timestamp'] ??
+      rec['timestamp'] ??
+      rec['created_at'] ??
+      rec['createdAt'] ??
+      '',
+    requestNumber: rec['request_number'] ?? rec['requestNumber'] ?? '',
+    requesterName: rec['requester_name'] ?? rec['requesterName'] ?? '',
+    department: rec['department'] ?? '',
+    indentSeries: rec['indent_series'] ?? rec['indentSeries'] ?? '',
+    division: rec['division'] ?? '',
+    itemCode: rec['item_code'] ?? rec['itemCode'] ?? '',
+    productName: rec['product_name'] ?? rec['productName'] ?? '',
+    requestQty: Number(rec['request_qty'] ?? rec['requestQty'] ?? 0) || 0,
+    uom: rec['uom'] ?? '',
+    costLocation: rec['cost_location'] ?? rec['costLocation'] ?? '',
+    formType: rec['form_type'] ?? rec['formType'] ?? '',
+    status: normalizeStatus(rec['request_status']),
+  };
+};
 
 export default function ApprowIndentData() {
   const [rows, setRows] = useState<IndentRow[]>([]);
@@ -90,57 +71,39 @@ export default function ApprowIndentData() {
   const [openEdit, setOpenEdit] = useState(false);
   const [modalItems, setModalItems] = useState<IndentRow[]>([]);
   const [saving, setSaving] = useState(false);
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const canSave = useMemo(
+    () =>
+      modalItems.length > 0 &&
+      modalItems.every(
+        (item) =>
+          item.status &&
+          item.status !== '' &&
+          item.status.toUpperCase() !== 'PENDING'
+      ),
+    [modalItems]
+  );
 
-  // Fetch rows
   useEffect(() => {
     let active = true;
     setLoading(true);
 
-    fetchSheet('INDENT')
-      .then((res) => {
+    const fetchIndents = async () => {
+      try {
+        const res = await axiosInstance.get('/indent/all');
         if (!active) return;
-        const list = Array.isArray(res)
-          ? res
-          : Array.isArray((res as any).rows)
-          ? (res as any).rows
-          : [];
 
-        // console.log('[frontend] fetched sheet rows:', list);
+        const payload = Array.isArray(res.data?.data)
+          ? res.data.data
+          : Array.isArray(res.data)
+            ? res.data
+            : [];
 
-        const s = (v: unknown) => (typeof v === 'string' ? v : '');
-        const n = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : 0);
-        const DATA_STARTS_AT = 7;
-
-        type Rec = Record<string, any>;
-        const mapped = list.map((r, idx) => {
-          const rec = r as Rec;
-          const obj: IndentRow = {
-            timestamp: s(rec['timestamp'] ?? rec['Timestamp']),
-            requestNumber: s(rec['requestNumber'] ?? rec['Request Number']),
-            requesterName: s(rec['requesterName'] ?? rec['Requester Name']),
-            department: s(rec['department'] ?? rec['Department']),
-            indentSeries: s(rec['indentSeries'] ?? rec['Indent Series']),
-            division: s(rec['division'] ?? rec['Division']),
-            itemCode: s(rec['itemCode'] ?? rec['Item Code']),
-            productName: s(rec['productName'] ?? rec['Product Name']),
-            requestQty: n(rec['requestQty'] ?? rec['Request Qty']),
-            uom: s(rec['uom'] ?? rec['UOM']),
-            costLocation: s(rec['costLocation'] ?? rec['Cost Location']),
-            formType: s(rec['formType'] ?? rec['Form Type']),
-            status: s(rec['requestStatus'] ?? ''),
-            rowIndex:
-              typeof rec['rowIndex'] === 'number' && rec['rowIndex'] > 0
-                ? rec['rowIndex']
-                : DATA_STARTS_AT + idx,
-            sheetName: s(rec['sheetName'] ?? 'INDENT'),
-          };
-          return obj;
-        });
-
-        // console.log('[frontend] mapped rows:', mapped);
+        const mapped = payload.map((rec: Record<string, any>) =>
+          mapApiRowToIndent(rec)
+        );
         setRows(mapped);
 
-        // Fill header with latest request
         if (mapped.length > 0) {
           const sorted = [...mapped].sort(
             (a, b) => Date.parse(b.timestamp || '') - Date.parse(a.timestamp || '')
@@ -149,8 +112,19 @@ export default function ApprowIndentData() {
           if (latest?.requestNumber) setIndentNumber(latest.requestNumber);
           if (latest?.requesterName) setHeaderRequesterName(latest.requesterName);
         }
-      })
-      .finally(() => active && setLoading(false));
+      } catch (err) {
+        console.error('Failed to load indents', err);
+        if (active) {
+          toast.error('Failed to load indent list');
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchIndents();
 
     return () => {
       active = false;
@@ -160,55 +134,85 @@ export default function ApprowIndentData() {
   // Show only PENDING or empty
   const pendingRows = useMemo(
     () =>
-      rows.filter(
-        (r) => !r.status || r.status === '' || r.status.toUpperCase() === 'PENDING'
-      ),
+      rows.filter((r) => {
+        const status = (r.status || '').toUpperCase();
+        const formType = (r.formType || '').toUpperCase();
+        const isPending = !status || status === '' || status === 'PENDING';
+        const isIndent = formType === 'INDENT';
+        return isPending && isIndent;
+      }),
     [rows]
   );
 
- const columns: ColumnDef<IndentRow>[] = useMemo(
-  () => [
-     {
-      id: 'actions',
-      header: 'Actions',
-      cell: ({ row }) => (
-        <div className="flex gap-2 justify-center">
-          <button
-            className="px-2 py-1 rounded bg-primary text-white text-xs"
-            onClick={(e) => {
-              e.preventDefault();
-              const r = row.original;
-              const rn = r.requestNumber || '';
-              const sameReqRows = rows.filter((x) => x.requestNumber === rn);
-              // console.log('[frontend] editing:', rn, sameReqRows);
-              setIndentNumber(rn);
-              setHeaderRequesterName(r.requesterName || '');
-              setModalItems(sameReqRows);
-              setOpenEdit(true);
-            }}
-          >
-            Process
-          </button>
-        </div>
-      ),
-    },
-    { accessorKey: 'requestNumber', header: 'Request No.' },
-    { accessorKey: 'formType', header: 'Form Type' },
-    { accessorKey: 'indentSeries', header: 'Series' },
-    { accessorKey: 'requesterName', header: 'Requester' },
-    { accessorKey: 'department', header: 'Department' },
-    { accessorKey: 'division', header: 'Division' },
-    { accessorKey: 'itemCode', header: 'Item Code' },
-    { accessorKey: 'productName', header: 'Product' },
-    { accessorKey: 'uom', header: 'UOM' },
-    { accessorKey: 'requestQty', header: 'Qty' },
-    { accessorKey: 'costLocation', header: 'Cost Location' },
+  const fetchRequestItems = useCallback(async (requestNo: string) => {
+    const res = await axiosInstance.get(`/indent/${requestNo}`);
+    const payload = res.data?.data;
+    const list = Array.isArray(payload)
+      ? payload
+      : payload
+        ? [payload]
+        : [];
+    return list.map((rec: Record<string, any>) => mapApiRowToIndent(rec));
+  }, []);
 
-    // ✅ Moved this to the very end (Actions column)
-   
-  ],
-  [rows]
-);
+  const handleProcess = useCallback(async (row: IndentRow) => {
+    const rn = row.requestNumber || '';
+    if (!rn) {
+      toast.error('Request number unavailable for this row');
+      return;
+    }
+
+    setIndentNumber(rn);
+    setHeaderRequesterName(row.requesterName || '');
+    setModalItems([]);
+    setDetailsLoading(true);
+    setOpenEdit(true);
+
+    try {
+      const details = await fetchRequestItems(rn);
+      setModalItems(details);
+    } catch (err) {
+      console.error('Failed to fetch request details', err);
+      toast.error('Failed to fetch indent details');
+      setOpenEdit(false);
+    } finally {
+      setDetailsLoading(false);
+    }
+  }, [fetchRequestItems]);
+
+  const columns: ColumnDef<IndentRow>[] = useMemo(
+    () => [
+      {
+        id: 'actions',
+        header: 'Actions',
+        cell: ({ row }) => (
+          <div className="flex gap-2 justify-center">
+            <button
+              className="px-2 py-1 rounded bg-primary text-white text-xs"
+              onClick={(e) => {
+                e.preventDefault();
+                handleProcess(row.original);
+              }}
+            >
+              Process
+            </button>
+          </div>
+        ),
+      },
+      { accessorKey: 'requestNumber', header: 'Request No.' },
+      { accessorKey: 'formType', header: 'Form Type' },
+      { accessorKey: 'indentSeries', header: 'Series' },
+      { accessorKey: 'requesterName', header: 'Requester' },
+      { accessorKey: 'department', header: 'Department' },
+      { accessorKey: 'division', header: 'Division' },
+      { accessorKey: 'itemCode', header: 'Item Code' },
+      { accessorKey: 'productName', header: 'Product' },
+      { accessorKey: 'uom', header: 'UOM' },
+      { accessorKey: 'requestQty', header: 'Qty' },
+      { accessorKey: 'costLocation', header: 'Cost Location' },
+    ],
+    [handleProcess]
+  );
 
 
   function selectFromRow(r: IndentRow) {
@@ -216,26 +220,45 @@ export default function ApprowIndentData() {
     setHeaderRequesterName(r.requesterName || '');
   }
 
-  // Save changes
   async function onSaveEdit() {
+    if (!indentNumber) {
+      toast.error('Request number missing');
+      return;
+    }
+
+    if (!canSave) {
+      toast.error('Please approve or reject every item before saving');
+      return;
+    }
+
     try {
       setSaving(true);
-      // console.log('[frontend] saving modal items:', modalItems);
 
-      // Update UI
+      const payload = modalItems.map((item) => ({
+        id: item.id,
+        request_number: indentNumber,
+        item_code: item.itemCode,
+        request_qty: Number(item.requestQty ?? 0),
+        approved_quantity: Number(item.requestQty ?? 0),
+        request_status:
+          item.status && item.status !== '' ? item.status : 'PENDING',
+      }));
+
+      await axiosInstance.put(`/indent/${indentNumber}/status`, {
+        items: payload,
+      });
+
       setRows((prev) => {
         const reqNo = indentNumber;
         const others = prev.filter((p) => p.requestNumber !== reqNo);
         return [...others, ...modalItems];
       });
 
-      // Push updates to GAS
-      await sendApprovedToSheet(modalItems, 'INDENT');
-
+      toast.success('Indent status updated');
       setOpenEdit(false);
     } catch (err) {
-      console.error('[frontend] Failed to update sheet', err);
-      alert('Failed to update sheet');
+      console.error('Failed to update indent status', err);
+      toast.error('Failed to update indent status');
     } finally {
       setSaving(false);
     }
@@ -306,7 +329,13 @@ export default function ApprowIndentData() {
                 </tr>
               </thead>
               <tbody>
-                {modalItems.length === 0 ? (
+                {detailsLoading ? (
+                  <tr>
+                    <td colSpan={6} className="text-center py-4 text-muted-foreground">
+                      Loading items...
+                    </td>
+                  </tr>
+                ) : modalItems.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="text-center py-4 text-muted-foreground">
                       No items for this request.
@@ -389,7 +418,7 @@ export default function ApprowIndentData() {
                 e.preventDefault();
                 onSaveEdit();
               }}
-              disabled={saving}
+              disabled={saving || !canSave}
             >
               {saving ? 'Saving…' : 'Save Changes'}
             </button>
