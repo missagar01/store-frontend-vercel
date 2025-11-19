@@ -298,7 +298,7 @@ export default function StoreOutApproval() {
       />
 
       <Dialog open={openEdit} onOpenChange={setOpenEdit}>
-        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-hidden">
           <DialogHeader>
             <DialogTitle>Edit / Approve Items</DialogTitle>
             <DialogDescription>
@@ -317,8 +317,8 @@ export default function StoreOutApproval() {
             </div>
           </div>
 
-          <div className="border rounded-md overflow-hidden">
-            <table className="w-full text-sm">
+          <div className="border rounded-md overflow-auto">
+            <table className="w-full text-sm min-w-[640px]">
               <thead className="bg-muted">
                 <tr>
                   <th className="text-left px-2 py-2">Item Code</th>
