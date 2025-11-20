@@ -8,13 +8,15 @@ const isLocalhost =
   (window.location.hostname === "localhost" ||
     window.location.hostname === "127.0.0.1");
 
-const envApi = (import.meta.env.VITE_API_URL || "").trim();
-const DEFAULT_API = "http://3.6.126.4:3004";
+const envApi = import.meta.env.VITE_API_URL;
 
-// Prefer explicit env; otherwise:
-// - localhost → direct backend IP
-// - hosted (Vercel/CloudFront with proxy) → /api so rewrites can work
-export const API_URL = envApi || (isLocalhost ? DEFAULT_API : "/api");
+// 🟢 Prefer explicit env override everywhere (including production/static hosting)
+// 🔵 Otherwise: localhost → direct backend, prod → '/api' (for setups with proxy)
+export const API_URL = envApi
+  ? envApi
+  : isLocalhost
+    ? "http://3.6.126.4:3004"
+    : "/api";
 
 
 // ================= AUTH HELPERS =================
@@ -31,7 +33,6 @@ export function isTokenExpired(token) {
 
     return currentTime >= expirationTime - 5000; // 5s buffer
   } catch (e) {
-    
     return true;
   }
 }
