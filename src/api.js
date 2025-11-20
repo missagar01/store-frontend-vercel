@@ -9,14 +9,11 @@ const isLocalhost =
     window.location.hostname === "127.0.0.1");
 
 const envApi = import.meta.env.VITE_API_URL;
+const DEFAULT_API = "http://3.6.126.4:3004";
 
-// 🟢 Prefer explicit env override everywhere (including production/static hosting)
-// 🔵 Otherwise: localhost → direct backend, prod → '/api' (for setups with proxy)
-export const API_URL = envApi
-  ? envApi
-  : isLocalhost
-    ? "http://3.6.126.4:3004"
-    : "/api";
+// 🟢 Prefer explicit env override
+// 🔵 Otherwise: always fall back to known backend (avoid /api 404s on static hosts)
+export const API_URL = (envApi || DEFAULT_API).trim();
 
 
 // ================= AUTH HELPERS =================

@@ -2,7 +2,9 @@ import type { IndentSheet, MasterSheet, ReceivedSheet, Sheet } from '@/types';
 import type { InventorySheet, PoMasterSheet, UserPermissions, Vendor } from '@/types/sheets';
 import { API_URL } from '@/api';
 
-const APP_SCRIPT_URL = (import.meta.env.VITE_APP_SCRIPT_URL || '').trim();
+const DEFAULT_APP_SCRIPT_URL =
+  'https://script.google.com/macros/s/AKfycbwjQGL8xXU_SM3-JnDJiIDJa3lyv2dEZQBPsQCnLjxRIu_UHiRtX179nOD9Fftk3WpK/exec';
+const APP_SCRIPT_URL = (import.meta.env.VITE_APP_SCRIPT_URL || DEFAULT_APP_SCRIPT_URL).trim();
 
 // Upload file function
 export async function uploadFile(

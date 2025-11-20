@@ -1,7 +1,7 @@
 // src/main.tsx
 import "@/index.css";
 import React, { StrictMode } from "react";
-import { createRoot } from "react-dom/client";
+import { createRoot, type Root } from "react-dom/client";
 import { AuthProvider, useAuth } from "@/context/AuthContext.tsx";
 import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 
@@ -171,7 +171,14 @@ function RootWithAuthRoutes() {
 }
 
 // ---------- MOUNT ----------
-createRoot(document.getElementById("root")!).render(
+const container = document.getElementById("root") as HTMLElement;
+
+// Prevent duplicate createRoot calls in dev/HMR
+const existingRoot: Root | undefined = (container as any).__app_root;
+const root = existingRoot ?? createRoot(container);
+(container as any).__app_root = root;
+
+root.render(
   <StrictMode>
     <AuthProvider>
       <HashRouter>
