@@ -56,9 +56,10 @@ export default function DataTable<TData, TValue>({
   const searchableFields = useMemo(() => {
     if (searchFields.length) return searchFields;
     return columns
-      .map((column) =>
-        typeof column.accessorKey === "string" ? column.accessorKey : undefined
-      )
+      .map((column) => {
+        const key = (column as any).accessorKey;
+        return typeof key === "string" ? key : undefined;
+      })
       .filter(Boolean) as string[];
   }, [columns, searchFields]);
 

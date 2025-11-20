@@ -156,11 +156,15 @@ export async function fetchVendorRateUpdateHistory() {
   return res.json();
 }
 
-export async function submitVendorRateUpdate(indentNumber: string, vendors: any) {
+export async function submitVendorRateUpdate(
+  indentNumber: string,
+  vendors: any,
+  comparisonSheetUrl?: string | null
+) {
   const res = await fetch(`${API_BASE}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ indentNumber, vendors }),
+    body: JSON.stringify({ indentNumber, vendors, comparisonSheetUrl }),
   });
   if (!res.ok) throw new Error('Failed to update vendor rate');
   return res.json();

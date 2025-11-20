@@ -279,17 +279,19 @@ export default function UserIndent() {
           ? res.data
           : [];
 
+      const numbers: number[] = list
+        .map((row: any) => {
+          const value = row.request_number ?? row.requestNumber ?? '';
+          if (typeof value !== 'string') return 0;
+          if (!value.toUpperCase().startsWith(prefix)) return 0;
+          const numeric = value.replace(/[^0-9]/g, '');
+          const parsed = parseInt(numeric, 10);
+          return Number.isNaN(parsed) ? 0 : parsed;
+        })
+        .filter((n: unknown): n is number => typeof n === 'number');
+
       const nextNumber =
-        list
-          .map((row: any) => {
-            const value = row.request_number ?? row.requestNumber ?? '';
-            if (typeof value !== 'string') return 0;
-            if (!value.toUpperCase().startsWith(prefix)) return 0;
-            const numeric = value.replace(/[^0-9]/g, '');
-            const parsed = parseInt(numeric, 10);
-            return Number.isNaN(parsed) ? 0 : parsed;
-          })
-          .reduce((max, current) => (current > max ? current : max), 0) + 1;
+        numbers.reduce((max: number, current: number) => (current > max ? current : max), 0) + 1;
 
       return `${prefix}${String(nextNumber).padStart(2, '0')}`;
     } catch (error) {

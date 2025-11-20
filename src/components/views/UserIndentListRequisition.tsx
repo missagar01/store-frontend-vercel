@@ -63,7 +63,7 @@ export default function UserIndentListRequisition() {
             purpose: r.purpose ?? '',
             costLocation: r.cost_location ?? r.costLocation ?? '',
           }))
-          .filter((r) => (r.formType || '').toUpperCase() === 'REQUISITION');
+          .filter((r: IndentRow) => (r.formType || '').toUpperCase() === 'REQUISITION');
 
         setRows(mapped);
       } catch (err) {

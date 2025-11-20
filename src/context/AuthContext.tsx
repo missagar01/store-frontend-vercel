@@ -19,11 +19,17 @@ interface DecodedToken {
   sub?: number;
   email?: string | null;
   username?: string;
+  user_name?: string;
+  name?: string;
   employee_id?: string;   // 👈 we care about this
   role?: string;
+  receiveItemView?: boolean;
+  receiveItemAction?: boolean;
+  userIndent?: boolean;
   iat?: number;
   exp?: number;
   iss?: string;
+  [key: string]: string | number | boolean | null | undefined;
 }
 
 interface AuthState {

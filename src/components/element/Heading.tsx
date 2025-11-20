@@ -3,7 +3,7 @@ import { SidebarTrigger } from '../ui/sidebar';
 import { TabsList, TabsTrigger } from '../ui/tabs';
 
 interface HeaderProps {
-    children: ReactNode;
+    children?: ReactNode;
     heading: string;
     subtext: string;
     tabs?: boolean;

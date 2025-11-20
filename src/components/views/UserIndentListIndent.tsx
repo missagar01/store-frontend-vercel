@@ -63,7 +63,7 @@ export default function UserIndentListIndent() {
             purpose: r.purpose ?? '',
             costLocation: r.cost_location ?? r.costLocation ?? '',
           }))
-          .filter((r) => (r.formType || '').toUpperCase() === 'INDENT');
+          .filter((r: IndentRow) => (r.formType || '').toUpperCase() === 'INDENT');
 
         setRows(mapped);
       } catch (err) {

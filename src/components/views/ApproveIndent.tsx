@@ -177,8 +177,8 @@ export default function ApproveIndent() {
     init?: RequestInit
   ) {
     const token = localStorage.getItem("token");
-    const headers: HeadersInit = {
-      ...(init?.headers || {}),
+    const headers: Record<string, string> = {
+      ...(init?.headers as Record<string, string>),
     };
     if (token) {
       headers.Authorization = `Bearer ${token}`;

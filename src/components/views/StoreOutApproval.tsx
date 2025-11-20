@@ -33,9 +33,13 @@ type IndentRow = {
 };
 
 const mapApiRowToIndent = (rec: Record<string, any>): IndentRow => {
-  const normalizeStatus = (val: unknown) => {
+  const normalizeStatus = (val: unknown): IndentRow['status'] => {
     if (typeof val !== 'string') return '';
-    return val.toUpperCase();
+    const upper = val.toUpperCase();
+    if (upper === 'APPROVED' || upper === 'REJECTED' || upper === 'PENDING') {
+      return upper as IndentRow['status'];
+    }
+    return '';
   };
 
   return {
@@ -73,12 +77,10 @@ export default function StoreOutApproval() {
   const canSave = useMemo(
     () =>
       modalItems.length > 0 &&
-      modalItems.every(
-        (item) =>
-          item.status &&
-          item.status !== '' &&
-          item.status.toUpperCase() !== 'PENDING'
-      ),
+      modalItems.every((item) => {
+        const status = (item.status ?? '').toUpperCase();
+        return status === 'APPROVED' || status === 'REJECTED';
+      }),
     [modalItems]
   );
 
@@ -234,8 +236,10 @@ export default function StoreOutApproval() {
         item_code: item.itemCode,
         request_qty: Number(item.requestQty ?? 0),
         approved_quantity: Number(item.requestQty ?? 0),
-        request_status:
-          item.status && item.status !== '' ? item.status : 'PENDING',
+        request_status: (() => {
+          const status = (item.status ?? '').toUpperCase();
+          return status || 'PENDING';
+        })(),
       }));
 
       await axiosInstance.put(`/indent/${indentNumber}/status`, {

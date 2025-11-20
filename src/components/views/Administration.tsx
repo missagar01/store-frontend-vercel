@@ -129,7 +129,7 @@ export default () => {
                         <DropdownMenuTrigger
                             asChild
                             disabled={
-                                user.username === 'admin' || user.username === currentUser.username
+                                user.username === 'admin' || user.username === currentUser?.username
                             }
                         >
                             <Button variant="ghost" className="h-8 w-8 p-0">

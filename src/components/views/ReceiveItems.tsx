@@ -148,7 +148,7 @@ export default () => {
     }, [receivedSheet]);
 
     const columns: ColumnDef<RecieveItemsData>[] = [
-        ...(user.receiveItemView
+        ...(user?.receiveItemView
             ? [
                   {
                       header: 'Action',

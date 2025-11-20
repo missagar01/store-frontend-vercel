@@ -2,6 +2,7 @@ export type Sheet = 'INDENT' | 'RECEIVED' | 'MASTER' | 'USER' | 'PO MASTER' | "I
 
 export type IndentSheet = {
     timestamp: string;
+    indentNumber: string;
     requestNumber: string;
     indentSeries: string;
     requesterName: string;
@@ -97,6 +98,8 @@ export type IndentSheet = {
     issueStatus: string;
     issuedQuantity: number;
     areaOfUse:string;
+    vendorType?: string;
+    [key: string]: any;
 };
 
 export type ReceivedSheet = {

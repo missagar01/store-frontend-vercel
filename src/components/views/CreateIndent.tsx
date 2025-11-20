@@ -32,6 +32,9 @@ export default () => {
         indenterName: z.string().nonempty(),
         indentApproveBy: z.string().nonempty(),
         indentType: z.enum(['Purchase', 'Store Out'], { required_error: 'Select a status' }),
+        division: z.string().nonempty(),
+        requiredDate: z.string().nonempty(),
+        indentDate: z.string().nonempty(),
         products: z
             .array(
                 z.object({
@@ -48,12 +51,17 @@ export default () => {
             .min(1, 'At least one product is required'),
     });
 
-    const form = useForm({
+    type FormValues = z.infer<typeof schema>;
+
+    const form = useForm<FormValues>({
         resolver: zodResolver(schema),
         defaultValues: {
             indenterName: '',
             indentApproveBy: '',
             indentType: undefined,
+            division: '',
+            requiredDate: '',
+            indentDate: '',
             products: [
                 {
                     attachment: undefined,
@@ -75,7 +83,7 @@ export default () => {
         name: 'products',
     });
 
-    async function onSubmit(data) {
+    async function onSubmit(data: FormValues) {
         try {
             for (const product of data.products) {
                 const row = {
