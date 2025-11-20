@@ -2,6 +2,8 @@ import type { IndentSheet, MasterSheet, ReceivedSheet, Sheet } from '@/types';
 import type { InventorySheet, PoMasterSheet, UserPermissions, Vendor } from '@/types/sheets';
 import { API_URL } from '@/api';
 
+const APP_SCRIPT_URL = (import.meta.env.VITE_APP_SCRIPT_URL || '').trim();
+
 // Upload file function
 export async function uploadFile(
   file: File,
@@ -33,7 +35,7 @@ export async function uploadFile(
     form.append('emailBody', 'Please find attached PO.');
   }
 
-  const response = await fetch(import.meta.env.VITE_APP_SCRIPT_URL, {
+  const response = await fetch(APP_SCRIPT_URL, {
     method: 'POST',
     body: form,
     redirect: 'follow',
@@ -52,7 +54,7 @@ export async function fetchSheet(
 ): Promise<
   MasterSheet | IndentSheet[] | ReceivedSheet[] | UserPermissions[] | PoMasterSheet[] | InventorySheet[]
 > {
-  const url = `${import.meta.env.VITE_APP_SCRIPT_URL}?sheetName=${encodeURIComponent(sheetName)}`;
+  const url = `${APP_SCRIPT_URL}?sheetName=${encodeURIComponent(sheetName)}`;
   const response = await fetch(url);
 
   if (!response.ok) throw new Error('Failed to fetch data');
@@ -125,7 +127,7 @@ export async function postToSheet(
   form.append('sheetName', sheet);
   form.append('rows', JSON.stringify(data));
 
-  const response = await fetch(import.meta.env.VITE_APP_SCRIPT_URL, {
+  const response = await fetch(APP_SCRIPT_URL, {
     method: 'POST',
     body: form,
   });
