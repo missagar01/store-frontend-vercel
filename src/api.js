@@ -8,11 +8,15 @@ const isLocalhost =
   (window.location.hostname === "localhost" ||
     window.location.hostname === "127.0.0.1");
 
-// 🟢 Local (npm run dev) → direct AWS backend
-// 🔵 Vercel / production → "/api" (rewrites → AWS)
-export const API_URL = isLocalhost
-  ? (import.meta.env.VITE_API_URL || "http://3.6.126.4:3004")
-  : "/api";
+const envApi = import.meta.env.VITE_API_URL;
+
+// 🟢 Prefer explicit env override everywhere (including production/static hosting)
+// 🔵 Otherwise: localhost → direct backend, prod → '/api' (for setups with proxy)
+export const API_URL = envApi
+  ? envApi
+  : isLocalhost
+    ? "http://3.6.126.4:3004"
+    : "/api";
 
 
 // ================= AUTH HELPERS =================
