@@ -3,7 +3,7 @@ import "@/index.css";
 import React, { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { AuthProvider, useAuth } from "@/context/AuthContext.tsx";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import Login from "./components/views/Login";
 import Dashboard from "./components/views/Dashboard";
@@ -174,9 +174,9 @@ function RootWithAuthRoutes() {
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <AuthProvider>
-      <BrowserRouter>
+      <HashRouter>
         <RootWithAuthRoutes />
-      </BrowserRouter>
+      </HashRouter>
     </AuthProvider>
   </StrictMode>
 );
