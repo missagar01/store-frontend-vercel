@@ -20,6 +20,7 @@ type ComboboxProps = {
   value: string[];
   onChange: (val: string[]) => void;
   placeholder?: string;
+  disabled?: boolean;
 };
 
 export function ComboBox({
@@ -28,10 +29,13 @@ export function ComboBox({
   value,
   onChange,
   placeholder = "Select option(s)",
+  disabled = false,
 }: ComboboxProps) {
   const [open, setOpen] = useState(false);
 
   const handleSelect = (val: string) => {
+    if (disabled) return;
+
     if (multiple) {
       if (value.includes(val)) {
         onChange(value.filter((v) => v !== val));
@@ -51,9 +55,15 @@ export function ComboBox({
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open && !disabled} onOpenChange={(val) => !disabled && setOpen(val)}>
       <PopoverTrigger asChild>
-        <Button variant="outline" role="combobox" aria-expanded={open} className="w-full justify-between">
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between"
+          disabled={disabled}
+        >
           <span className="text-muted-foreground">{displayLabel()}</span>
           <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
         </Button>

@@ -11,11 +11,12 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import Heading from '../element/Heading';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import axiosInstance from '@/utils/axiosConfig';
 import { API_URL, decodeToken } from '@/api';
 import { toast } from 'sonner';
+import { ComboBox } from '@/components/ui/combobox';
 type IndentForm = {
   formType: 'INDENT' | 'REQUISITION' | '';  // 👈 new
   indentSeries: string;
@@ -79,6 +80,30 @@ export default function UserIndent() {
   const { control, handleSubmit, watch, setValue, reset } = form;
   const { fields, append, remove } = useFieldArray({ control, name: 'items' });
   const itemCount = watch('items').length;
+  const productOptions = useMemo(
+    () =>
+      masterItems.map((it) => ({
+        label: it.item_name,
+        value: it.item_name,
+      })),
+    [masterItems]
+  );
+  const uomOptions = useMemo(
+    () =>
+      uomList.map((u) => ({
+        label: u,
+        value: u,
+      })),
+    [uomList]
+  );
+  const costLocationOptions = useMemo(
+    () =>
+      costLocations.map((c) => ({
+        label: c,
+        value: c,
+      })),
+    [costLocations]
+  );
 
   const formType = watch('formType');      // 👈 watch formType
   // 0) Preselect formType from query param
@@ -550,27 +575,17 @@ export default function UserIndent() {
                       <FormItem>
                         <FormLabel>Product Name</FormLabel>
                         <FormControl>
-                          <select
-                            {...field}
-                            onChange={(e) =>
-                              handleItemSelect(index, e.target.value)
+                          <ComboBox
+                            options={productOptions}
+                            value={field.value ? [field.value] : []}
+                            onChange={(val) =>
+                              handleItemSelect(index, val[0] || '')
                             }
-                            className="border rounded-md h-10 px-3 text-sm w-full"
-                          >
-                            <option value="">
-                              {loadingItems
-                                ? 'Loading items...'
-                                : 'Select Product'}
-                            </option>
-                            {masterItems.map((it) => (
-                              <option
-                                key={it.item_code}
-                                value={it.item_name}
-                              >
-                                {it.item_name}
-                              </option>
-                            ))}
-                          </select>
+                            placeholder={
+                              loadingItems ? 'Loading items...' : 'Select Product'
+                            }
+                            disabled={loadingItems}
+                          />
                         </FormControl>
                       </FormItem>
                     )}
@@ -602,17 +617,13 @@ export default function UserIndent() {
                       <FormItem>
                         <FormLabel>UOM</FormLabel>
                         <FormControl>
-                          <select
-                            {...field}
-                            className="border rounded-md h-10 px-3 text-sm w-full"
-                          >
-                            <option value="">Select UOM</option>
-                            {uomList.map((u) => (
-                              <option key={u} value={u}>
-                                {u}
-                              </option>
-                            ))}
-                          </select>
+                          <ComboBox
+                            options={uomOptions}
+                            value={field.value ? [field.value] : []}
+                            onChange={(val) => field.onChange(val[0] || '')}
+                            placeholder="Select UOM"
+                            disabled={uomOptions.length === 0}
+                          />
                         </FormControl>
                       </FormItem>
                     )}
@@ -658,24 +669,19 @@ export default function UserIndent() {
                       <FormItem>
                         <FormLabel>Cost / Project Location</FormLabel>
                         <FormControl>
-                          <select
-                            {...field}
-                            className="border rounded-md h-10 px-3 text-sm w-full"
-                            disabled={!division || loadingCostLocations}
-                          >
-                            <option value="">
-                              {loadingCostLocations
+                          <ComboBox
+                            options={costLocationOptions}
+                            value={field.value ? [field.value] : []}
+                            onChange={(val) => field.onChange(val[0] || '')}
+                            placeholder={
+                              loadingCostLocations
                                 ? 'Loading locations...'
                                 : !division
                                   ? 'Select Division first'
-                                  : 'Select Cost Location'}
-                            </option>
-                            {costLocations.map((location) => (
-                              <option key={location} value={location}>
-                                {location}
-                              </option>
-                            ))}
-                          </select>
+                                  : 'Select Cost Location'
+                            }
+                            disabled={!division || loadingCostLocations}
+                          />
                         </FormControl>
                       </FormItem>
                     )}

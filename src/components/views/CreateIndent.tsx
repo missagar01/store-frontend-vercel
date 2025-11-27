@@ -13,6 +13,7 @@ import {
     SelectContent,
     SelectItem,
 } from '@/components/ui/select';
+import { ComboBox } from '@/components/ui/combobox';
 import { ClipLoader as Loader } from 'react-spinners';
 import { ClipboardList, Trash } from 'lucide-react';
 import { postToSheet, uploadFile } from '@/lib/fetchers';
@@ -318,24 +319,16 @@ export default () => {
                                                                 *
                                                             </span>
                                                         </FormLabel>
-                                                        <Select
-                                                            onValueChange={field.onChange}
-                                                            value={field.value}
+                                                        <ComboBox
+                                                            options={productOptions.map((dep) => ({
+                                                                label: dep,
+                                                                value: dep,
+                                                            }))}
+                                                            value={field.value ? [field.value] : []}
+                                                            onChange={(val) => field.onChange(val[0] || '')}
+                                                            placeholder="Select product"
                                                             disabled={!groupHead}
-                                                        >
-                                                            <FormControl>
-                                                                <SelectTrigger className="w-full">
-                                                                    <SelectValue placeholder="Select product" />
-                                                                </SelectTrigger>
-                                                            </FormControl>
-                                                            <SelectContent>
-                                                                {productOptions.map((dep, i) => (
-                                                                    <SelectItem key={i} value={dep}>
-                                                                        {dep}
-                                                                    </SelectItem>
-                                                                ))}
-                                                            </SelectContent>
-                                                        </Select>
+                                                        />
                                                     </FormItem>
                                                 )}
                                             />

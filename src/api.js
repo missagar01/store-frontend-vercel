@@ -9,7 +9,7 @@ const isLocalhost =
     window.location.hostname === "127.0.0.1");
 
 const envApi = import.meta.env.VITE_API_URL;
-const DEFAULT_API = "http://3.6.126.4:3004";
+const DEFAULT_API = "https://storebackend.sagartmt.com";
 
 // 🟢 Prefer explicit env override
 // 🔵 Otherwise: always fall back to known backend (avoid /api 404s on static hosts)
@@ -91,6 +91,7 @@ export function decodeToken(token) {
     return null;
   }
 }
+
 
 export function handleAuthError() {
   localStorage.removeItem("token");

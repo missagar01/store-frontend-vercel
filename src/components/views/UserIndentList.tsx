@@ -3,6 +3,7 @@ import Heading from '../element/Heading';
 import DataTable from '../element/DataTable';
 import type { ColumnDef } from '@tanstack/react-table';
 import { Button } from '../ui/button';
+import { ComboBox } from '../ui/combobox';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import axiosInstance from '@/utils/axiosConfig';
@@ -30,6 +31,9 @@ export default function UserIndentList() {
   const { user } = useAuth();
   const [rows, setRows] = useState<IndentRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [productFilter, setProductFilter] = useState<string[]>([]);
+  const [uomFilter, setUomFilter] = useState<string[]>([]);
+  const [locationFilter, setLocationFilter] = useState<string[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -85,9 +89,71 @@ export default function UserIndentList() {
 
   const filteredRows = useMemo(() => {
     const currentName = user?.name || user?.user_name;
-    if (!currentName) return rows;
-    return rows.filter((r) => (r.requesterName || '').toLowerCase() === String(currentName).toLowerCase());
-  }, [rows, user]);
+    const productValue = productFilter[0] ?? '';
+    const uomValue = uomFilter[0] ?? '';
+    const locationValue = locationFilter[0] ?? '';
+
+    let data = rows;
+    if (currentName) {
+      data = data.filter((r) => (r.requesterName || '').toLowerCase() === String(currentName).toLowerCase());
+    }
+
+    if (productValue) {
+      data = data.filter((r) => (r.productName || '').toLowerCase() === productValue.toLowerCase());
+    }
+
+    if (uomValue) {
+      data = data.filter((r) => (r.uom || '').toLowerCase() === uomValue.toLowerCase());
+    }
+
+    if (locationValue) {
+      data = data.filter((r) => (r.costLocation || '').toLowerCase() === locationValue.toLowerCase());
+    }
+
+    return data;
+  }, [rows, user, productFilter, uomFilter, locationFilter]);
+
+  const productOptions = useMemo(() => {
+    const set = new Set<string>();
+    rows.forEach((r) => {
+      const val = (r.productName || '').trim();
+      if (val) set.add(val);
+    });
+    return [
+      { label: 'All products', value: '' },
+      ...Array.from(set)
+        .sort((a, b) => a.localeCompare(b))
+        .map((v) => ({ label: v, value: v })),
+    ];
+  }, [rows]);
+
+  const uomOptions = useMemo(() => {
+    const set = new Set<string>();
+    rows.forEach((r) => {
+      const val = (r.uom || '').trim();
+      if (val) set.add(val);
+    });
+    return [
+      { label: 'All UOM', value: '' },
+      ...Array.from(set)
+        .sort((a, b) => a.localeCompare(b))
+        .map((v) => ({ label: v, value: v })),
+    ];
+  }, [rows]);
+
+  const locationOptions = useMemo(() => {
+    const set = new Set<string>();
+    rows.forEach((r) => {
+      const val = (r.costLocation || '').trim();
+      if (val) set.add(val);
+    });
+    return [
+      { label: 'All locations', value: '' },
+      ...Array.from(set)
+        .sort((a, b) => a.localeCompare(b))
+        .map((v) => ({ label: v, value: v })),
+    ];
+  }, [rows]);
 
   const columns: ColumnDef<IndentRow>[] = [
     { accessorKey: 'requestNumber', header: 'Request No.' },
@@ -106,6 +172,23 @@ export default function UserIndentList() {
   return (
     <div className="p-4 md:p-6 lg:p-10">
       <Heading heading="User Indents" subtext="Your submitted indent and requisition lines" />
+
+      <div className="mb-4 grid gap-3 md:grid-cols-3">
+        <div className="flex flex-col gap-1">
+          <span className="text-sm font-medium text-muted-foreground">Product Name</span>
+          <ComboBox options={productOptions} value={productFilter} onChange={setProductFilter} placeholder="All products" />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <span className="text-sm font-medium text-muted-foreground">UOM</span>
+          <ComboBox options={uomOptions} value={uomFilter} onChange={setUomFilter} placeholder="All UOM" />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <span className="text-sm font-medium text-muted-foreground">Cost / Project Location</span>
+          <ComboBox options={locationOptions} value={locationFilter} onChange={setLocationFilter} placeholder="All locations" />
+        </div>
+      </div>
 
       <DataTable
         data={filteredRows}
