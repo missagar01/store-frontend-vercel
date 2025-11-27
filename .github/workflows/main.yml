@@ -3,7 +3,8 @@ name: Deploy React App to S3
 on:
   push:
     branches:
-      - main    # agar aapki branch ka naam main hai (jo aapne dikhaya)
+      - main
+      - master  # deploy when pushing to either main or master
 
 jobs:
   build-and-deploy:

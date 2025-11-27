@@ -159,6 +159,11 @@ function RootWithAuthRoutes() {
           </>
         ) : (
           <>
+            {isAdmin ? (
+              <Route index element={<Dashboard />} />
+            ) : (
+              <Route index element={<Navigate to="user-indent" replace />} />
+            )}
             {(isAdmin ? adminRoutes : userRoutes).map(({ path, element }) => (
               <Route key={path} path={path} element={<GatedRoute>{element}</GatedRoute>} />
             ))}

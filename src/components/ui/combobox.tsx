@@ -21,6 +21,7 @@ type ComboboxProps = {
   onChange: (val: string[]) => void;
   placeholder?: string;
   disabled?: boolean;
+  className?: string;
 };
 
 export function ComboBox({
@@ -30,8 +31,10 @@ export function ComboBox({
   onChange,
   placeholder = "Select option(s)",
   disabled = false,
+  className,
 }: ComboboxProps) {
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
 
   const handleSelect = (val: string) => {
     if (disabled) return;
@@ -54,6 +57,15 @@ export function ComboBox({
     return options.find((opt) => opt.value === value[0])?.label ?? placeholder;
   };
 
+  const filteredOptions = options.filter((opt) => {
+    if (!search.trim()) return true;
+    const needle = search.toLowerCase();
+    return (
+      opt.label.toLowerCase().includes(needle) ||
+      opt.value.toLowerCase().includes(needle)
+    );
+  });
+
   return (
     <Popover open={open && !disabled} onOpenChange={(val) => !disabled && setOpen(val)}>
       <PopoverTrigger asChild>
@@ -61,22 +73,38 @@ export function ComboBox({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-full justify-between"
+          className={cn("w-full justify-between", className)}
           disabled={disabled}
         >
           <span className="text-muted-foreground">{displayLabel()}</span>
           <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[200px] p-0">
+      <PopoverContent
+        align="start"
+        className="w-[var(--radix-popover-trigger-width)] min-w-[240px] max-w-full p-0"
+      >
         <Command>
-          <CommandInput placeholder="Search..." />
+          <CommandInput
+            placeholder="Search..."
+            value={search}
+            onValueChange={setSearch}
+          />
           <CommandList>
             <CommandEmpty>No options found.</CommandEmpty>
             <CommandGroup>
-              {options.map((opt) => (
-                <CommandItem key={opt.value} value={opt.value} onSelect={() => handleSelect(opt.value)}>
-                  <Check className={cn("mr-2 h-4 w-4", value.includes(opt.value) ? "opacity-100" : "opacity-0")} />
+              {filteredOptions.map((opt) => (
+                <CommandItem
+                  key={opt.value}
+                  value={`${opt.label} ${opt.value}`}
+                  onSelect={() => handleSelect(opt.value)}
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      value.includes(opt.value) ? "opacity-100" : "opacity-0"
+                    )}
+                  />
                   {opt.label}
                 </CommandItem>
               ))}
