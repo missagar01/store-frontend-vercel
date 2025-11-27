@@ -3,17 +3,21 @@
 // 🔹 Decide BASE API URL based on environment (local vs production)
 // src/api.js
 
-const isLocalhost =
-  typeof window !== "undefined" &&
-  (window.location.hostname === "localhost" ||
-    window.location.hostname === "127.0.0.1");
-
 const envApi = import.meta.env.VITE_API_URL;
 const DEFAULT_API = "https://storebackend.sagartmt.com";
 
 // 🟢 Prefer explicit env override
 // 🔵 Otherwise: always fall back to known backend (avoid /api 404s on static hosts)
-export const API_URL = (envApi || DEFAULT_API).trim();
+// 🔒 If the page is served over HTTPS, auto-upgrade an http:// API to https:// to avoid mixed-content blocks in Vercel/S3.
+const rawApi = (envApi || DEFAULT_API || "").trim();
+const isBrowser = typeof window !== "undefined";
+const shouldUpgradeToHttps =
+  isBrowser && window.location.protocol === "https:" && rawApi.startsWith("http://");
+
+export const API_URL = (shouldUpgradeToHttps
+  ? rawApi.replace(/^http:\/\//i, "https://")
+  : rawApi
+).replace(/\/+$/, "");
 
 
 // ================= AUTH HELPERS =================
