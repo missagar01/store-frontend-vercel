@@ -22,9 +22,11 @@ type IndentForm = {
   indentSeries: string;
   department: string;
   requesterName: string;
+  username: string;
   division: string;
   items: {
     productName: string;
+    category: string;
     itemCode: string;
     uom: string;
     requestQty: string;
@@ -35,23 +37,24 @@ type IndentForm = {
   }[];
 };
 
-type MasterItem = {
-  item_code: string;
-  item_name: string;
-};
-
 type UomRow = {
   item_code: string;
   item_name: string;
   uom: string;
 };
 
+type StoreItem = {
+  groupname: string;
+  item_code: string;
+  itemname: string;
+};
+
 export default function UserIndent() {
   const location = useLocation();
-  const [masterItems, setMasterItems] = useState<MasterItem[]>([]);
+  const [storeItems, setStoreItems] = useState<StoreItem[]>([]);
   const [uomList, setUomList] = useState<string[]>([]);
   const [costLocations, setCostLocations] = useState<string[]>([]);
-  const [loadingItems, setLoadingItems] = useState(false);
+  const [loadingProducts, setLoadingProducts] = useState<boolean>(false);
   const [loadingCostLocations, setLoadingCostLocations] = useState(false);
   const [previousDivision, setPreviousDivision] = useState<string>('');
 
@@ -61,12 +64,14 @@ export default function UserIndent() {
       indentSeries: '',
       department: '',
       requesterName: '',
+      username: '',
       division: '',
       items: [
         {
+          category: '',
           productName: '',
           itemCode: '',
-          uom: '',
+          uom: '', 
           requestQty: '',
           make: '',
           specification: '',
@@ -77,17 +82,9 @@ export default function UserIndent() {
     },
   });
 
-  const { control, handleSubmit, watch, setValue, reset } = form;
+  const { control, handleSubmit, watch, setValue, reset, getValues } = form;
   const { fields, append, remove } = useFieldArray({ control, name: 'items' });
   const itemCount = watch('items').length;
-  const productOptions = useMemo(
-    () =>
-      masterItems.map((it) => ({
-        label: it.item_name,
-        value: it.item_name,
-      })),
-    [masterItems]
-  );
   const uomOptions = useMemo(
     () =>
       uomList.map((u) => ({
@@ -104,6 +101,20 @@ export default function UserIndent() {
       })),
     [costLocations]
   );
+  const groupOptions = useMemo(() => {
+    const uniqueGroupNames = Array.from(
+      new Set(
+        storeItems
+          .map((item) => item.groupname)
+          .filter((name) => Boolean(name))
+      )
+    );
+
+    return uniqueGroupNames.map((group) => ({
+      label: group,
+      value: group,
+    }));
+  }, [storeItems]);
 
   const formType = watch('formType');      // 👈 watch formType
   // 0) Preselect formType from query param
@@ -134,27 +145,52 @@ export default function UserIndent() {
         if (res.data?.success && res.data.data) {
           const user = res.data.data;
           setValue('requesterName', user.user_name || '');
+          setValue('username', user.username || '');
           setValue('department', user.user_access || '');
         }
       })
       .catch(() => {});
   }, [setValue]);
-
-  // 2) load item master
+  // 2) load master items (group + product list)
   useEffect(() => {
     const fetchItems = async () => {
       try {
-        setLoadingItems(true);
+        setLoadingProducts(true);
         const res = await axiosInstance.get('/items');
-        if (res.data?.success && Array.isArray(res.data.data)) {
-          setMasterItems(res.data.data);
-        }
+        const rawItems = Array.isArray(res.data?.data)
+          ? res.data.data
+          : Array.isArray(res.data)
+            ? res.data
+            : [];
+
+        const normalizedItems = rawItems
+          .map((item: any) => ({
+            groupname:
+              String(item.groupname || item.groupName || item.GROUP_NAME || '')
+                .trim(),
+            item_code:
+              String(item.item_code || item.itemCode || item.ITEM_CODE || '')
+                .trim(),
+            itemname:
+              String(item.itemname || item.item_name || item.ITEM_NAME || '')
+                .trim(),
+          }))
+          .filter((item) => item.item_code && item.itemname);
+
+        const uniqueItems = Array.from(
+          new Map(
+            normalizedItems.map((item) => [item.item_code, item])
+          ).values()
+        );
+
+        setStoreItems(uniqueItems);
       } catch (err) {
         console.error('Failed to load items', err);
       } finally {
-        setLoadingItems(false);
+        setLoadingProducts(false);
       }
     };
+
     fetchItems();
   }, []);
 
@@ -286,10 +322,21 @@ export default function UserIndent() {
     fetchCostLocations();
   }, [division, setValue, form, previousDivision]);
 
-  const handleItemSelect = (rowIndex: number, selectedName: string) => {
-    setValue(`items.${rowIndex}.productName`, selectedName);
-    const found = masterItems.find((it) => it.item_name === selectedName);
-    setValue(`items.${rowIndex}.itemCode`, found?.item_code || '');
+  const handleProductSelect = (rowIndex: number, selectedItemCode: string) => {
+    if (!selectedItemCode) {
+      setValue(`items.${rowIndex}.productName`, '');
+      setValue(`items.${rowIndex}.itemCode`, '');
+      setValue(`items.${rowIndex}.category`, '');
+      return;
+    }
+
+    const selectedItem = storeItems.find(
+      (item) => item.item_code === selectedItemCode
+    );
+
+    setValue(`items.${rowIndex}.productName`, selectedItem?.itemname || '');
+    setValue(`items.${rowIndex}.itemCode`, selectedItem?.item_code || '');
+    setValue(`items.${rowIndex}.category`, selectedItem?.groupname || '');
   };
 
   const generateRequestNumber = async (
@@ -359,22 +406,25 @@ export default function UserIndent() {
             : '';
 
           return {
-            form_type: data.formType,
-            indent_series: data.indentSeries,
-            requester_name: data.requesterName || '',
-            department: data.department || '',
-            division: data.division || '',
-            item_code: item.itemCode || '',
-            product_name: item.productName || '',
-            request_qty: qty,
-            uom: item.uom || '',
-            specification: specificationValue,
-            make: item.make || '',
-            purpose: item.purpose || '',
-            cost_location: item.costLocation || '',
-            request_state: 'PENDING',
-            request_number: requestNumber,
-          };
+          form_type: data.formType,
+          indent_series: data.indentSeries,
+          requester_name: data.requesterName || '',
+          department: data.department || '',
+          division: data.division || '',
+          item_code: item.itemCode || '',
+          product_name: item.productName || '',
+          category: item.category || '',
+          group_name: item.category || '',
+          request_qty: qty,
+          uom: item.uom || '',
+          specification: specificationValue,
+          make: item.make || '',
+          purpose: item.purpose || '',
+          cost_location: item.costLocation || '',
+          request_state: 'PENDING',
+          request_number: requestNumber,
+          created_at: new Date().toISOString(),
+        };
         });
 
       if (payloads.length === 0) {
@@ -395,6 +445,7 @@ export default function UserIndent() {
         division: '',
         items: [
           {
+            category: '',
             productName: '',
             itemCode: '',
             uom: '',
@@ -430,6 +481,9 @@ export default function UserIndent() {
         >
           {/* Header */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Department */}
+           
+
             {/* Form Type */}
             <FormField
               control={control}
@@ -471,16 +525,18 @@ export default function UserIndent() {
                 </FormItem>
               )}
             />
-
-            {/* department */}
-            <FormField
+             <FormField
               control={control}
               name="department"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Department</FormLabel>
                   <FormControl>
-                    <Input {...field} readOnly className="bg-gray-100" />
+                    <Input
+                      {...field}
+                      readOnly
+                      className="bg-gray-100"
+                    />
                   </FormControl>
                 </FormItem>
               )}
@@ -566,29 +622,84 @@ export default function UserIndent() {
                   </Button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* Product Name */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {/* Group Name */}
                   <FormField
                     control={control}
-                    name={`items.${index}.productName`}
+                    name={`items.${index}.category`}
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Product Name</FormLabel>
+                        <FormLabel>Group Name</FormLabel>
                         <FormControl>
                           <ComboBox
-                            options={productOptions}
+                            options={groupOptions}
                             value={field.value ? [field.value] : []}
-                            onChange={(val) =>
-                              handleItemSelect(index, val[0] || '')
-                            }
+                            onChange={(val) => {
+                              const selectedGroup = val[0] || '';
+                              field.onChange(selectedGroup);
+                              setValue(`items.${index}.productName`, '');
+                              setValue(`items.${index}.itemCode`, '');
+                            }}
                             placeholder={
-                              loadingItems ? 'Loading items...' : 'Select Product'
+                              loadingProducts
+                                ? 'Loading groups...'
+                                : groupOptions.length === 0
+                                ? 'No groups available'
+                                : 'Select Group'
                             }
-                            disabled={loadingItems}
+                            disabled={loadingProducts || groupOptions.length === 0}
                           />
                         </FormControl>
                       </FormItem>
                     )}
+                  />
+
+                  {/* Product Name */}
+                  <FormField
+                    control={control}
+                    name={`items.${index}.productName`}
+                    render={() => {
+                      const selectedGroup = watch(`items.${index}.category`);
+                      const productOptions = storeItems
+                        .filter((item) => item.groupname === selectedGroup)
+                        .map((item) => ({
+                          label: item.itemname,
+                          value: item.item_code,
+                        }));
+
+                      return (
+                        <FormItem>
+                          <FormLabel>Product Name</FormLabel>
+                          <FormControl>
+                            <ComboBox
+                              options={productOptions}
+                              value={
+                                getValues(`items.${index}.itemCode`)
+                                  ? [getValues(`items.${index}.itemCode`)]
+                                  : []
+                              }
+                              onChange={(val) =>
+                                handleProductSelect(index, val[0] || '')
+                              }
+                              placeholder={
+                                loadingProducts
+                                  ? 'Loading products...'
+                                  : !selectedGroup
+                                  ? 'Select Group first'
+                                  : productOptions.length === 0
+                                  ? 'No items in group'
+                                  : 'Select Product'
+                              }
+                              disabled={
+                                loadingProducts ||
+                                !selectedGroup ||
+                                productOptions.length === 0
+                              }
+                            />
+                          </FormControl>
+                        </FormItem>
+                      );
+                    }}
                   />
 
                   {/* Item Code */}
@@ -741,6 +852,7 @@ export default function UserIndent() {
               className="flex items-center gap-2"
               onClick={() =>
                 append({
+                  category: '',
                   productName: '',
                   itemCode: '',
                   uom: '',

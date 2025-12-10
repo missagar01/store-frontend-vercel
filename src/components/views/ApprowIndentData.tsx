@@ -200,6 +200,19 @@ export default function ApprowIndentData() {
           </div>
         ),
       },
+      {
+        accessorKey: 'timestamp',
+        header: 'Timestamp',
+        cell: ({ row }) => {
+          const timestamp = row.original.timestamp;
+          if (!timestamp) return '';
+          const date = new Date(timestamp);
+          return date.toLocaleString('en-IN', {
+            timeZone: 'Asia/Kolkata',
+            year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+          });
+        },
+      },
       { accessorKey: 'requestNumber', header: 'Request No.' },
       { accessorKey: 'formType', header: 'Form Type' },
       { accessorKey: 'indentSeries', header: 'Series' },

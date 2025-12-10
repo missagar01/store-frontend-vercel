@@ -296,8 +296,8 @@ export default function PurchaseOrders() {
             />
           </div>
 
-          <div className="max-h-[70vh] overflow-auto border rounded-xl bg-white shadow-sm">
-            <table className="min-w-[1200px] text-xs border-collapse">
+          <div className="w-full border rounded-xl bg-white shadow-sm">
+            <table className="w-full text-xs border-collapse">
               <thead className="sticky top-0 z-20 bg-slate-100">
                 <tr>
                   {/* Sticky left: PO No. */}
@@ -409,8 +409,8 @@ export default function PurchaseOrders() {
             />
           </div>
 
-          <div className="max-h-[70vh] overflow-auto border rounded-xl bg-white shadow-sm">
-            <table className="min-w-[1200px] text-xs border-collapse">
+          <div className="w-full border rounded-xl bg-white shadow-sm">
+            <table className="w-full text-xs border-collapse">
               <thead className="sticky top-0 z-20 bg-slate-100">
                 <tr>
                   {/* Sticky PO No. */}

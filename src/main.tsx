@@ -11,6 +11,7 @@ import App from "./App";
 import ApproveIndent from "@/components/views/ApproveIndent";
 import { SheetsProvider } from "./context/SheetsContext";
 import StoreOutApproval from "./components/views/StoreOutApproval";
+import CompletedItems from "./components/views/CompletedItems";
 import type { RouteAttributes } from "./types";
 import {
   LayoutDashboard,
@@ -66,6 +67,13 @@ const adminRoutes: RouteAttributes[] = [
           (typeof sheet["indentType"] === "string" &&
             sheet["indentType"] === "Store Out")
       ).length,
+  },
+  {
+    path: "completed-items",
+    name: "Completed Items",
+    icon: <ClipboardCheck size={20} />,
+    element: <CompletedItems />,
+    notifications: () => 0,
   },
   { path: "administration", name: "Administration", icon: <ShieldUser size={20} />, element: <Administration />, notifications: () => 0 },
   {
@@ -125,6 +133,13 @@ function RootWithAuthRoutes() {
                           element: <StoreOutApproval />,
                           notifications: () => 0,
                         },
+                        {
+                          path: "completed-items",
+                          name: "Completed Items",
+                          icon: <ClipboardCheck size={20} />,
+                          element: <CompletedItems />,
+                          notifications: () => 0,
+                        },
                       ]
                     : isApproveIndentOnly
                     ? [
@@ -148,6 +163,7 @@ function RootWithAuthRoutes() {
         {isStoreOutOnly ? (
           <>
             <Route index element={<Navigate to="store-out-approval" replace />} />
+            <Route path="completed-items" element={<CompletedItems />} />
             <Route path="store-out-approval" element={<StoreOutApproval />} />
             <Route path="*" element={<Navigate to="store-out-approval" replace />} />
           </>

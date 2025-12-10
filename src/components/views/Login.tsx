@@ -41,7 +41,7 @@ export default function Login() {
         if (decoded?.employee_id) {
           const emp = decoded.employee_id;
           if (STORE_OUT_ONLY.includes(emp)) {
-            navigate("/store-out-approval", { replace: true });
+            navigate("/store-out-approval", { replace: true }); // Default page for store out users
             return;
           }
           if (emp === APPROVE_INDENT_ONLY) {
@@ -89,7 +89,7 @@ export default function Login() {
         if (decoded?.employee_id) {
           const emp = decoded.employee_id;
           if (STORE_OUT_ONLY.includes(emp)) {
-            navigate("/store-out-approval", { replace: true });
+            navigate("/store-out-approval", { replace: true }); // Default page for store out users
             return;
           }
           if (emp === APPROVE_INDENT_ONLY) {

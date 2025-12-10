@@ -8,9 +8,11 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import axiosInstance from '@/utils/axiosConfig';
 import { toast } from 'sonner';
+import { format } from 'date-fns';
 
 type IndentRow = {
-  timestamp: string;
+  id?: string;
+  timestamp: string; // from created_at or sample_timestamp
   formType?: string;
   requestNumber?: string;
   indentSeries?: string;
@@ -21,9 +23,32 @@ type IndentRow = {
   productName?: string;
   requestQty?: number;
   uom?: string;
+  specification?: string;
   make?: string;
   purpose?: string;
   costLocation?: string;
+  planned_1?: string;
+  actual_1?: string;
+  time_delay_1?: string;
+  requestStatus?: string;
+  approved_quantity?: string;
+  updated_at?: string;
+  category_name?: string;
+};
+
+const formatIndianDateTime = (isoString: string | null | undefined) => {
+  if (!isoString) return 'N/A';
+  try {
+    const date = new Date(isoString);
+    // Format to match '8 Dec 2025, 05:07 pm'
+    return date.toLocaleString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+  } catch (error) {
+    console.error("Invalid date provided for formatting:", isoString);
+    return 'Invalid Date'; // Keep error feedback
+  }
 };
 
 export default function UserIndentListRequisition() {
@@ -47,26 +72,38 @@ export default function UserIndentListRequisition() {
         const list = Array.isArray(res.data?.data)
           ? res.data.data
           : Array.isArray(res.data)
-            ? res.data
-            : [];
+          ? res.data
+          : [];
 
         const mapped = list
-          .map((r: any) => ({
-            timestamp: r.sample_timestamp ?? r.timestamp ?? r.created_at ?? '',
-            formType: r.form_type ?? r.formType ?? '',
-            requestNumber: r.request_number ?? r.requestNumber ?? '',
-            indentSeries: r.indent_series ?? r.indentSeries ?? '',
-            requesterName: r.requester_name ?? r.requesterName ?? '',
-            department: r.department ?? '',
-            division: r.division ?? '',
-            itemCode: r.item_code ?? r.itemCode ?? '',
-            productName: r.product_name ?? r.productName ?? '',
-            requestQty: Number(r.request_qty ?? r.requestQty ?? 0) || 0,
-            uom: r.uom ?? '',
-            make: r.make ?? '',
-            purpose: r.purpose ?? '',
-            costLocation: r.cost_location ?? r.costLocation ?? '',
-          }))
+          .map(
+            (r: any) =>
+              ({
+                id: r.id ?? '',
+                timestamp: r.created_at ?? r.sample_timestamp ?? '',
+                formType: r.form_type ?? '',
+                requestNumber: r.request_number ?? '',
+                indentSeries: r.indent_series ?? '',
+                requesterName: r.requester_name ?? '',
+                department: r.department ?? '',
+                division: r.division ?? '',
+                itemCode: r.item_code ?? '',
+                productName: r.product_name ?? '',
+                requestQty: Number(r.request_qty ?? 0),
+                uom: r.uom ?? '',
+                specification: r.specification ?? '',
+                make: r.make ?? '',
+                purpose: r.purpose ?? '',
+                costLocation: r.cost_location ?? '',
+                planned_1: r.planned_1 ?? '',
+                actual_1: r.actual_1 ?? '',
+                time_delay_1: r.time_delay_1 ?? '',
+                requestStatus: r.request_status ?? '',
+                approved_quantity: r.approved_quantity ?? '',
+                updated_at: r.updated_at ?? '',
+                category_name: r.category_name ?? '',
+              } as IndentRow)
+          )
           .filter((r: IndentRow) => (r.formType || '').toUpperCase() === 'REQUISITION');
 
         setRows(mapped);
@@ -158,6 +195,7 @@ export default function UserIndentListRequisition() {
   }, [rows]);
 
   const columns: ColumnDef<IndentRow>[] = [
+    { accessorKey: 'timestamp', header: 'Timestamp', cell: ({ row }) => formatIndianDateTime(row.original.timestamp) },
     { accessorKey: 'requestNumber', header: 'Request No.' },
     { accessorKey: 'indentSeries', header: 'Series' },
     { accessorKey: 'requesterName', header: 'Requester' },
@@ -168,6 +206,23 @@ export default function UserIndentListRequisition() {
     { accessorKey: 'uom', header: 'UOM' },
     { accessorKey: 'requestQty', header: 'Qty' },
     { accessorKey: 'costLocation', header: 'Cost Location' },
+    {
+      accessorKey: 'requestStatus',
+      header: 'Status',
+      cell: ({ row }) => {
+        const status = row.original.requestStatus?.toUpperCase();
+        if (status === 'APPROVED') {
+          return <span className="font-medium text-green-600">APPROVED</span>;
+        }
+        if (status === 'REJECTED') {
+          return <span className="font-medium text-red-600">REJECTED</span>;
+        }
+        if (status === 'PENDING') {
+          return <span className="font-medium text-blue-600">PENDING</span>;
+        }
+        return <span className="text-gray-500">{row.original.requestStatus}</span>;
+      },
+    },
   ];
 
   return (
@@ -194,16 +249,7 @@ export default function UserIndentListRequisition() {
       <DataTable
         data={filteredRows}
         columns={columns}
-        searchFields={[
-          'requestNumber',
-          'indentSeries',
-          'requesterName',
-          'department',
-          'division',
-          'itemCode',
-          'productName',
-          'costLocation',
-        ]}
+        searchFields={columns.map((c) => c.accessorKey as string).filter((key) => key !== 'timestamp' && key !== 'planned_1' && key !== 'actual_1' && key !== 'updated_at' && key !== 'requestQty')}
         dataLoading={loading}
         className="h-[74dvh]"
       >
@@ -212,5 +258,3 @@ export default function UserIndentListRequisition() {
     </div>
   );
 }
-
-

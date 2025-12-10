@@ -24,6 +24,7 @@ type IndentRow = {
   make?: string;
   purpose?: string;
   costLocation?: string;
+  requestStatus?: string;
 };
 
 export default function UserIndentListIndent() {
@@ -66,6 +67,7 @@ export default function UserIndentListIndent() {
             make: r.make ?? '',
             purpose: r.purpose ?? '',
             costLocation: r.cost_location ?? r.costLocation ?? '',
+            requestStatus: r.request_status ?? '',
           }))
           .filter((r: IndentRow) => (r.formType || '').toUpperCase() === 'INDENT');
 
@@ -158,6 +160,19 @@ export default function UserIndentListIndent() {
   }, [rows]);
 
   const columns: ColumnDef<IndentRow>[] = [
+    {
+      accessorKey: 'timestamp',
+      header: 'Timestamp',
+      cell: ({ row }) => {
+        const timestamp = row.original.timestamp;
+        if (!timestamp) return '';
+        const date = new Date(timestamp);
+        return date.toLocaleString('en-IN', {
+          timeZone: 'Asia/Kolkata',
+          year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+        });
+      },
+    },
     { accessorKey: 'requestNumber', header: 'Request No.' },
     { accessorKey: 'indentSeries', header: 'Series' },
     { accessorKey: 'requesterName', header: 'Requester' },
@@ -168,6 +183,23 @@ export default function UserIndentListIndent() {
     { accessorKey: 'uom', header: 'UOM' },
     { accessorKey: 'requestQty', header: 'Qty' },
     { accessorKey: 'costLocation', header: 'Cost Location' },
+    {
+      accessorKey: 'requestStatus',
+      header: 'Status',
+      cell: ({ row }) => {
+        const status = row.original.requestStatus?.toUpperCase();
+        if (status === 'APPROVED') {
+          return <span className="font-medium text-green-600">APPROVED</span>;
+        }
+        if (status === 'REJECTED') {
+          return <span className="font-medium text-red-600">REJECTED</span>;
+        }
+        if (status === 'PENDING') {
+          return <span className="font-medium text-blue-600">PENDING</span>;
+        }
+        return <span className="text-gray-500">{row.original.requestStatus}</span>;
+      },
+    },
   ];
 
   return (
@@ -212,5 +244,3 @@ export default function UserIndentListIndent() {
     </div>
   );
 }
-
-

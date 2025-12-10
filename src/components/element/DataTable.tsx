@@ -99,7 +99,7 @@ export default function DataTable<TData, TValue>({
       <div className="relative max-w-full overflow-x-auto">
         <div
           className={cn(
-            "rounded-sm border h-[74dvh] w-full overflow-auto",
+            "rounded-sm border w-full overflow-hidden",
             className
           )}
         >

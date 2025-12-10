@@ -72,17 +72,7 @@ export async function loginUser(identifier, password) {
 }
 
 export async function logoutUser() {
-  const token = localStorage.getItem("token");
-
-  const res = await fetch(`${API_URL}/auth/logout`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  });
-
-  return res.json().catch(() => ({}));
+  return Promise.resolve({ success: true });
 }
 
 export function decodeToken(token) {

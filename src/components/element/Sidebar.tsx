@@ -48,21 +48,21 @@ export default function Sidebar({ items }: { items: RouteAttributes[] }) {
           </Button>
         </div>
         <SidebarSeparator />
-        <div className="flex justify-between items-center px-3 text-xs text-muted-foreground">
-          <div>
-            <p>
-              Name:{" "}
-              <span className="font-semibold">
-                {user?.name ?? user?.username ?? "—"}
-              </span>
-            </p>
-            <p>
-              Username:{" "}
-              <span className="font-semibold">
-                {user?.username ?? "—"}
-              </span>
-            </p>
-          </div>
+          <div className="flex justify-between items-center px-3 text-xs text-muted-foreground">
+            <div>
+              <p>
+                Name:{" "}
+                <span className="font-semibold">
+                  {user?.name ?? user?.user_name ?? user?.username ?? "—"}
+                </span>
+              </p>
+              <p>
+                Username:{" "}
+                <span className="font-semibold">
+                  {user?.username ?? user?.user_name ?? "—"}
+                </span>
+              </p>
+            </div>
           <Button variant="outline" className="size-8" onClick={() => logout()}>
             <LogOut />
           </Button>
