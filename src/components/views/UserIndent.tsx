@@ -163,8 +163,8 @@ export default function UserIndent() {
             ? res.data
             : [];
 
-        const normalizedItems = rawItems
-          .map((item: any) => ({
+        const normalizedItems: StoreItem[] = (rawItems as any[])
+          .map((item) => ({
             groupname:
               String(item.groupname || item.groupName || item.GROUP_NAME || '')
                 .trim(),
@@ -178,12 +178,12 @@ export default function UserIndent() {
           .filter((item) => item.item_code && item.itemname);
 
         const uniqueItems = Array.from(
-          new Map(
+          new Map<string, StoreItem>(
             normalizedItems.map((item) => [item.item_code, item])
           ).values()
         );
 
-        setStoreItems(uniqueItems);
+        setStoreItems(uniqueItems as StoreItem[]);
       } catch (err) {
         console.error('Failed to load items', err);
       } finally {

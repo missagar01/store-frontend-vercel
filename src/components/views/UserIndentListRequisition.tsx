@@ -249,7 +249,20 @@ export default function UserIndentListRequisition() {
       <DataTable
         data={filteredRows}
         columns={columns}
-        searchFields={columns.map((c) => c.accessorKey as string).filter((key) => key !== 'timestamp' && key !== 'planned_1' && key !== 'actual_1' && key !== 'updated_at' && key !== 'requestQty')}
+      searchFields={columns
+        .map((c) => {
+          const key = (c as any).accessorKey;
+          return typeof key === 'string' ? key : undefined;
+        })
+        .filter((key): key is string => !!key)
+        .filter(
+          (key) =>
+            key !== 'timestamp' &&
+            key !== 'planned_1' &&
+            key !== 'actual_1' &&
+            key !== 'updated_at' &&
+            key !== 'requestQty'
+        )}
         dataLoading={loading}
         className="h-[74dvh]"
       >

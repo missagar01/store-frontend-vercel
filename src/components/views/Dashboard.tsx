@@ -252,7 +252,7 @@ export default function Dashboard() {
             {isEmpty ? (
               <p className="text-sm text-muted-foreground">Vendor insights will appear here.</p>
             ) : (
-              vendorData.map((vendor, index) => (
+              vendorData.map((vendor) => (
                 <div key={vendor.name} className="flex items-center justify-between rounded-lg border px-3 py-2">
                   <div>
                     <p className="font-semibold">{vendor.name}</p>
