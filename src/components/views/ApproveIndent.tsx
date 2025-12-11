@@ -167,6 +167,8 @@ export default function ApproveIndent() {
   const [historySearch, setHistorySearch] = useState("");
 
   const [loading, setLoading] = useState(false);
+  const [downloadingPending, setDownloadingPending] = useState(false);
+  const [downloadingHistory, setDownloadingHistory] = useState(false);
   const [selectedIndent, setSelectedIndent] = useState<IndentRow | null>(null);
   const [openDialog, setOpenDialog] = useState(false);
 
@@ -247,6 +249,41 @@ export default function ApproveIndent() {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleDownload(type: "pending" | "history") {
+    if (typeof window === "undefined") return;
+
+    const setDownloading =
+      type === "pending" ? setDownloadingPending : setDownloadingHistory;
+    const downloadPath = `/store-indent/${type}/download`;
+    const fileName =
+      type === "pending"
+        ? "pending-indents.xlsx"
+        : "history-indents.xlsx";
+
+    try {
+      setDownloading(true);
+      const response = await fetchWithToken(API_URL, downloadPath);
+      if (!response.ok) {
+        throw new Error("Download failed");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(`Failed to download ${type} indents`, err);
+      toast.error("Unable to download the file right now.");
+    } finally {
+      setDownloading(false);
     }
   }
 
@@ -424,17 +461,32 @@ export default function ApproveIndent() {
 
           {/* ========== PENDING TAB ========== */}
           <TabsContent value="pending">
-            <div className="mb-2">
-              <Input
-                placeholder="Search: Indent / Item / Dept / Indenter"
-                value={pendingSearch}
-                onChange={(e) => {
-                  setPendingSearch(e.target.value);
-                  setPendingPage(1);
-                }}
-                className="w-full"
-              />
-            </div>
+          <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <Input
+              placeholder="Search: Indent / Item / Dept / Indenter"
+              value={pendingSearch}
+              onChange={(e) => {
+                setPendingSearch(e.target.value);
+                setPendingPage(1);
+              }}
+              className="w-full sm:flex-1"
+            />
+            <Button
+              variant="destructive"
+              className="w-full sm:w-auto whitespace-nowrap"
+              onClick={() => handleDownload("pending")}
+              disabled={loading || downloadingPending}
+            >
+              {downloadingPending ? (
+                <div className="flex items-center gap-2">
+                  <Loader size={14} color="currentColor" />
+                  Downloading...
+                </div>
+              ) : (
+                "Download Pending Excel"
+              )}
+            </Button>
+          </div>
 
             <div className="max-h-[70vh] overflow-auto border rounded-xl bg-white shadow-sm">
               <table className="min-w-[1400px] text-xs border-collapse">
@@ -570,17 +622,32 @@ export default function ApproveIndent() {
 
           {/* ========== HISTORY TAB ========== */}
           <TabsContent value="history">
-            <div className="mb-2">
-              <Input
-                placeholder="Search: Indent / Item / Dept / Indenter"
-                value={historySearch}
-                onChange={(e) => {
-                  setHistorySearch(e.target.value);
-                  setHistoryPage(1);
-                }}
-                className="w-full"
-              />
-            </div>
+          <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <Input
+              placeholder="Search: Indent / Item / Dept / Indenter"
+              value={historySearch}
+              onChange={(e) => {
+                setHistorySearch(e.target.value);
+                setHistoryPage(1);
+              }}
+              className="w-full sm:flex-1"
+            />
+            <Button
+              variant="destructive"
+              className="w-full sm:w-auto whitespace-nowrap"
+              onClick={() => handleDownload("history")}
+              disabled={loading || downloadingHistory}
+            >
+              {downloadingHistory ? (
+                <div className="flex items-center gap-2">
+                  <Loader size={14} color="currentColor" />
+                  Downloading...
+                </div>
+              ) : (
+                "Download History Excel"
+              )}
+            </Button>
+          </div>
 
             <div className="max-h-[70vh] overflow-auto border rounded-xl bg-white shadow-sm">
               <table className="min-w-[1600px] text-xs border-collapse">

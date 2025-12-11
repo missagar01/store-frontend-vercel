@@ -59,6 +59,15 @@ function DashboardTooltip({
   );
 }
 
+function LoadingSpinner({ message = 'Loading dashboard data...' }: { message?: string }) {
+  return (
+    <div className="flex items-center gap-2 rounded-2xl border border-slate-200/80 bg-white/80 px-4 py-2 text-sm text-slate-500 shadow-lg shadow-slate-900/5">
+      <span className="h-6 w-6 animate-spin rounded-full border-4 border-slate-200 border-t-slate-500" />
+      <span>{message}</span>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const [dashboardData, setDashboardData] = useState<DashboardApiResponse['data'] | null>(null);
   const [chartData, setChartData] = useState<ChartDatum[]>([]);
@@ -173,6 +182,12 @@ export default function Dashboard() {
       <Heading heading="Procurement Pulse" subtext="Live insights from the store indent API">
         <LayoutDashboard size={46} className="text-primary" />
       </Heading>
+
+      {loading && !error && (
+        <div className="flex justify-center">
+          <LoadingSpinner />
+        </div>
+      )}
 
       {error && (
         <div className="rounded-2xl border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">

@@ -171,6 +171,8 @@ export default function PurchaseOrders() {
   const [historyPage, setHistoryPage] = useState(1);
 
   const [loading, setLoading] = useState(false);
+  const [downloadingPending, setDownloadingPending] = useState(false);
+  const [downloadingHistory, setDownloadingHistory] = useState(false);
 
   /* =========================
      Fetch: FULL LISTS
@@ -198,6 +200,44 @@ export default function PurchaseOrders() {
       toast.error("Failed to fetch purchase orders");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleDownload(type: "pending" | "history") {
+    const setLoadingState =
+      type === "pending" ? setDownloadingPending : setDownloadingHistory;
+    const downloadPath =
+      type === "pending" ? "/po/pending/download" : "/po/history/download";
+    const fileName =
+      type === "pending" ? "pending-purchase-orders.xlsx" : "received-purchase-orders.xlsx";
+
+    if (typeof window === "undefined") return;
+
+    try {
+      setLoadingState(true);
+      const headers: HeadersInit = {};
+      const token = localStorage.getItem("token");
+      if (token) headers.Authorization = `Bearer ${token}`;
+      const response = await fetch(`${API_URL}${downloadPath}`, { headers });
+      if (!response.ok) {
+        throw new Error("Download failed");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(`Failed to download ${type} purchase orders`, err);
+      toast.error("Unable to download the file right now.");
+    } finally {
+      setLoadingState(false);
     }
   }
 
@@ -284,7 +324,7 @@ export default function PurchaseOrders() {
         {/* ========== PENDING TAB ========== */}
         <TabsContent value="pending">
           {/* Search – full width */}
-          <div className="mb-2">
+          <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <Input
               placeholder="Search: PO No / Vendor / Item"
               value={pendingSearch}
@@ -292,8 +332,23 @@ export default function PurchaseOrders() {
                 setPendingSearch(e.target.value);
                 setPendingPage(1);
               }}
-              className="w-full"
+              className="w-full sm:flex-1"
             />
+            <Button
+              variant="destructive"
+              onClick={() => handleDownload("pending")}
+              disabled={downloadingPending}
+              className="w-full sm:w-auto whitespace-nowrap"
+            >
+              {downloadingPending ? (
+                <div className="flex items-center gap-2">
+                  <Loader size={14} color="currentColor" loading />
+                  Downloading...
+                </div>
+              ) : (
+                "Download Pending Excel"
+              )}
+            </Button>
           </div>
 
           <div className="w-full border rounded-xl bg-white shadow-sm">
@@ -397,7 +452,7 @@ export default function PurchaseOrders() {
         {/* ========== RECEIVED / HISTORY TAB ========== */}
         <TabsContent value="received">
           {/* Search – full width */}
-          <div className="mb-2">
+          <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <Input
               placeholder="Search: PO No / Vendor / Item"
               value={historySearch}
@@ -405,8 +460,23 @@ export default function PurchaseOrders() {
                 setHistorySearch(e.target.value);
                 setHistoryPage(1);
               }}
-              className="w-full"
+              className="w-full sm:flex-1"
             />
+            <Button
+              variant="destructive"
+              onClick={() => handleDownload("history")}
+              disabled={downloadingHistory}
+              className="w-full sm:w-auto whitespace-nowrap"
+            >
+              {downloadingHistory ? (
+                <div className="flex items-center gap-2">
+                  <Loader size={14} color="currentColor" loading />
+                  Downloading...
+                </div>
+              ) : (
+                "Download Received Excel"
+              )}
+            </Button>
           </div>
 
           <div className="w-full border rounded-xl bg-white shadow-sm">
